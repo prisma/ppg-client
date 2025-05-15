@@ -6,7 +6,6 @@ export class ConnectionStringError extends Error {
 }
 
 export interface ConnectionString {
-  baseUrl: URL;
   apiKey: string;
 }
 
@@ -27,13 +26,10 @@ export function parsePpgConnectionString(
   let baseUrl: URL;
 
   if (isLocalhost(url.hostname)) {
-    baseUrl = new URL(`http://${url.host}`);
-  } else {
-    baseUrl = new URL(`https://${url.host}`);
+    throw new ConnectionStringError("Local Prisma Postgres is not supported");
   }
 
   return {
-    baseUrl,
     apiKey,
   };
 }
