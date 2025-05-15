@@ -24,7 +24,8 @@
         "useImportExtensions": "error"
       },
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "useShorthandFunctionType": "off"
       }
     }
   },

@@ -1,8 +1,17 @@
 {
   "name": "@prisma/ppg",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Lightweight client for Prisma Postgres",
-  "keywords": ["prisma", "postgres", "ppg", "database", "client", "sql"],
+  "keywords": [
+    "prisma",
+    "postgres",
+    "postgresql",
+    "ppg",
+    "database",
+    "client",
+    "sql",
+    "serverless"
+  ],
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -13,7 +22,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --target esnext --out-dir dist",
-    "format": "biome format --write",
+    "format": "biome check --write",
     "prepack": "pnpm build"
   },
   "files": ["dist"],

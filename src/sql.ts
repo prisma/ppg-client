@@ -1,17 +1,23 @@
-export interface Queryable {
-  query(query: string, parameters: unknown[]): Promise<unknown>;
-}
+import type { Queryable } from "./queryable.ts";
 
 /**
- * Template literal tag function that immediately executes the query.
+ * Template literal tag function that executes the query.
+ *
+ * ```ts
+ * const [user] = await sql<User>`SELECT * FROM users WHERE id = ${id}`;
+ * ```
  */
-export type Sql = (
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-) => Promise<unknown>;
+export interface Sql {
+  <Record = unknown>(
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<Record[]>;
+}
 
-export function sqlFactory(client: Queryable): Sql {
-  return async function sql(
+export type Deserialize = (value: unknown, oid: unknown) => unknown;
+
+export function sqlFactory(client: Queryable, deserialize: Deserialize): Sql {
+  return async function sql<T>(
     strings: TemplateStringsArray,
     ...values: unknown[]
   ) {
@@ -19,6 +25,17 @@ export function sqlFactory(client: Queryable): Sql {
       (acc, str, i) => acc + str + (i < values.length ? `$${i + 1}` : ""),
       "",
     );
-    return await client.query(query, values);
+
+    const { columns, rows } = await client.query(query, values);
+
+    return rows.map(
+      (row) =>
+        Object.fromEntries(
+          columns.map((column, i) => [
+            column.name,
+            deserialize(row[i], column.oid),
+          ]),
+        ) as T,
+    );
   };
 }
