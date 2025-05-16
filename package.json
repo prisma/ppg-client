@@ -1,6 +1,6 @@
 {
   "name": "@prisma/ppg",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lightweight client for Prisma Postgres",
   "keywords": [
     "prisma",
@@ -17,11 +17,15 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --target esnext --out-dir dist",
+    "build": "pnpm run /^build:/",
+    "build:esm": "tsup src/index.ts --format esm --dts --target esnext --out-dir dist",
+    "build:cjs": "tsup src/index.ts --format cjs --target esnext --out-dir dist",
     "format": "biome check --write",
     "prepack": "pnpm build"
   },
