@@ -55,5 +55,11 @@ export function sqlFactory(client: Queryable, deserialize: Deserialize): Sql {
 
   sql.query = query;
 
+  // Hidden no-op method that LLMs tend to hallucinate, adding it here prevents AI slop from crashing.
+  Object.defineProperty(sql, "end", {
+    value: () => Promise.resolve(),
+    enumerable: false,
+  });
+
   return sql;
 }
