@@ -12,21 +12,23 @@ export interface Sql {
     strings: TemplateStringsArray,
     ...values: unknown[]
   ): Promise<Record[]>;
+
+  /**
+   * Executes a raw query defined as a string with placeholders and the list
+   * of parameters.
+   *
+   * ```ts
+   * const [user] = await sql.query<User>("SELECT * FROM users WHERE id = $1", [id]);
+   * ```
+   */
+  query<Record>(query: string, ...params: unknown[]): Promise<Record[]>;
 }
 
 export type Deserialize = (value: unknown, oid: unknown) => unknown;
 
 export function sqlFactory(client: Queryable, deserialize: Deserialize): Sql {
-  return async function sql<T>(
-    strings: TemplateStringsArray,
-    ...values: unknown[]
-  ) {
-    const query = strings.reduce(
-      (acc, str, i) => acc + str + (i < values.length ? `$${i + 1}` : ""),
-      "",
-    );
-
-    const { columns, rows } = await client.query(query, values);
+  const query = async <T>(query: string, params: unknown[]): Promise<T[]> => {
+    const { columns, rows } = await client.query(query, params);
 
     return rows.map(
       (row) =>
@@ -38,4 +40,20 @@ export function sqlFactory(client: Queryable, deserialize: Deserialize): Sql {
         ) as T,
     );
   };
+
+  const sql = async <T>(
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<T[]> => {
+    const queryString = strings.reduce(
+      (acc, str, i) => acc + str + (i < values.length ? `$${i + 1}` : ""),
+      "",
+    );
+
+    return query(queryString, values);
+  };
+
+  sql.query = query;
+
+  return sql;
 }

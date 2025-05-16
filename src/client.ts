@@ -32,7 +32,7 @@ interface PostgresError {
   severity_local: string;
   severity: string;
   code: string;
-  position: string;
+  position?: string;
   file: string;
   line: string;
   routine: string;
@@ -46,7 +46,7 @@ export class SqlError extends RequestError {
   severityLocal: string;
   severity: string;
   code: string;
-  position: string;
+  position?: string;
   file: string;
   line: string;
   routine: string;
@@ -120,7 +120,6 @@ export class Client implements Queryable {
       "severity_local" in errorJson &&
       "severity" in errorJson &&
       "code" in errorJson &&
-      "position" in errorJson &&
       "file" in errorJson &&
       "line" in errorJson &&
       "routine" in errorJson

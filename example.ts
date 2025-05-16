@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import ppg from "./src/index.ts";
 
 const sql = ppg(process.env.E2E_PPG_URL!);
@@ -19,3 +21,12 @@ type User = {
 const users: User[] = await sql`select * from users`;
 
 console.log(users);
+
+const [user1] =
+  await sql<User>`select * from users where email = ${"test@example.com"}`;
+
+const [user2] = await sql.query<User>("select * from users where email = $1", [
+  "test@example.com",
+]);
+
+assert.equal(user1.id, user2.id);
