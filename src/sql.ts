@@ -21,7 +21,7 @@ export interface Sql {
    * const [user] = await sql.query<User>("SELECT * FROM users WHERE id = $1", [id]);
    * ```
    */
-  query<Record>(query: string, ...params: unknown[]): Promise<Record[]>;
+  query<Record>(query: string, params: unknown[]): Promise<Record[]>;
 }
 
 export type Deserialize = (value: unknown, oid: unknown) => unknown;
