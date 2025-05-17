@@ -1,6 +1,6 @@
 {
   "name": "@prisma/ppg",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Lightweight client for Prisma Postgres",
   "keywords": [
     "prisma",
