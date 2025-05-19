@@ -1,5 +1,4 @@
 import type { QueryResponse, Queryable } from "./queryable.ts";
-import { type RawResponse, deserializeRawResult } from "./response.ts";
 import { parsePpgConnectionString } from "./url.ts";
 
 /**
