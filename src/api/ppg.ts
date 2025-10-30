@@ -1,4 +1,5 @@
-import type { ClientConfig, ResultsetIterator } from "./client.ts";
+import type { CollectableIterator } from "../common/types.ts";
+import type { ClientConfig } from "./client.ts";
 
 export declare function ppg(config: ClientConfig): Ppg;
 
@@ -27,7 +28,7 @@ export interface Sql {
      * const allUsers = await rows.collect();
      * ```
      */
-    <R = unknown>(strings: TemplateStringsArray, ...values: unknown[]): ResultsetIterator<R>;
+    <R = unknown>(strings: TemplateStringsArray, ...values: unknown[]): CollectableIterator<R>;
 
     /**
      * Executes a SQL command using template literal syntax and returns the number of affected rows.
@@ -83,7 +84,7 @@ export interface PpgQueryable {
      * const allUsers = await rows.collect();
      * ```
      */
-    query<R = unknown>(sql: string, ...params: unknown[]): ResultsetIterator<R>;
+    query<R = unknown>(sql: string, ...params: unknown[]): CollectableIterator<R>;
 
     /**
      * Executes a SQL command (INSERT, UPDATE, DELETE) and returns the number of affected rows.
@@ -161,7 +162,7 @@ export interface Ppg extends PpgQueryable {
      *   .query<Order>("SELECT * FROM orders WHERE id = $1", orderId)
      *   .exec("UPDATE inventory SET stock = stock - $1 WHERE id = $2", qty, inventoryId)
      *   .query<User>("SELECT * FROM users WHERE id = $1", userId)
-     *   .execute();
+     *   .run();
      * // orders: Order[], affected: number, users: User[]
      * ```
      */

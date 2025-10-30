@@ -2,15 +2,16 @@
  * Prisma Postgres Serverless API Wire Protocol API module.
  */
 
-import { type RawParameter, isBoundedByteStream } from "../common/types.ts";
-
-/**
- *
- */
-export const BINARY = "binary",
-    TEXT = "text";
-
-export type ParameterFormat = typeof BINARY | typeof TEXT;
+import {
+    BINARY,
+    type ParameterFormat,
+    type RawParameter,
+    TEXT,
+    isBoundedByteStream,
+    isByteArrayParameter,
+    boundedByteStream,
+} from "../common/types.ts";
+import { utf8ByteLength } from "./shims.ts";
 
 export type InlineQueryParameter = {
     type: ParameterFormat;
@@ -27,17 +28,17 @@ export type QueryParameter = InlineQueryParameter | ExtendedQueryParameter;
 export type StatementKind = "query" | "exec";
 export type QueryDescriptorFrame =
     | {
-          query: string;
-          parameters?: QueryParameter[];
-      }
+        query: string;
+        parameters?: QueryParameter[];
+    }
     | {
-          exec: string;
-          parameters?: QueryParameter[];
-      };
+        exec: string;
+        parameters?: QueryParameter[];
+    };
 
 export type ExtendedParamFrame = {
     type: ParameterFormat;
-    data: string | null | Uint8Array | ReadableStream<Uint8Array>;
+    data: NonNullable<RawParameter>;
 };
 
 export type RequestFrame = QueryDescriptorFrame | ExtendedParamFrame;
@@ -73,6 +74,38 @@ export type ErrorFrame = {
 };
 
 export type ResponseFrame = DataRowDescription | DataRow | CommandComplete | ErrorFrame;
+
+// Type guards for RequestFrame types
+export function isQueryDescriptorFrame(frame: RequestFrame): frame is QueryDescriptorFrame {
+    return ("query" in frame && typeof frame.query === "string") || ("exec" in frame && typeof frame.exec === "string");
+}
+
+export function isExtendedParamFrame(frame: RequestFrame): frame is ExtendedParamFrame {
+    return "type" in frame && "data" in frame && (frame.type === "text" || frame.type === "binary");
+}
+
+// Type guards for ResponseFrame types
+export function isDataRowDescription(frame: ResponseFrame): frame is DataRowDescription {
+    return "columns" in frame && Array.isArray(frame.columns);
+}
+
+export function isDataRow(frame: ResponseFrame): frame is DataRow {
+    return "values" in frame && Array.isArray(frame.values);
+}
+
+export function isCommandComplete(frame: ResponseFrame): frame is CommandComplete {
+    return "complete" in frame && frame.complete === true;
+}
+
+export function isErrorFrame(frame: ResponseFrame): frame is ErrorFrame {
+    return (
+        "error" in frame &&
+        typeof frame.error === "object" &&
+        frame.error !== null &&
+        "message" in frame.error &&
+        typeof frame.error.message === "string"
+    );
+}
 
 const EXENDED_PARAM_SIZE_THRESHOLD = 1 << 10; // 1kb
 
@@ -113,64 +146,110 @@ export async function requestFrames(
     // Process each parameter
     for (const param of rawParams) {
         if (typeof param === "string") {
-            // Handle string parameters
-            const data = new TextEncoder().encode(param);
-            if (data.byteLength <= EXENDED_PARAM_SIZE_THRESHOLD) {
+            // Handle string parameters - assume TEXT format
+            const byteLength = utf8ByteLength(param)
+            if (byteLength <= EXENDED_PARAM_SIZE_THRESHOLD) {
                 // Inline string parameter
                 queryParams.push({
                     type: TEXT,
                     value: param,
                 });
             } else {
-                // Extended string parameter
+                // Extended string parameter - use TextEncoderStream for memory efficiency
                 queryParams.push({
                     type: TEXT,
-                    byteSize: data.byteLength,
+                    byteSize: byteLength,
                 });
+                // Create a stream from the string using TextEncoderStream
+                const stringStream = new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(param);
+                        controller.close();
+                    }
+                });
+                const encoderStream = new TextEncoderStream();
+                const encodedStream = stringStream.pipeThrough(encoderStream);
+                // Wrap as BoundedByteStream to include format and byteLength metadata
+                const boundedStream = boundedByteStream(encodedStream, TEXT, byteLength);
+
                 extendedFrames.push({
                     type: TEXT,
-                    data: new TextEncoder().encode(param),
+                    data: boundedStream,
                 });
             }
-        } else if (param instanceof Uint8Array) {
-            // Handle binary Uint8Array parameters
+        } else if (isByteArrayParameter(param)) {
+            // Handle ByteArrayParameter with explicit format
             const byteLength = param.byteLength;
+            const format = param.format;
 
             if (byteLength <= EXENDED_PARAM_SIZE_THRESHOLD) {
-                // Inline binary parameter (encode as base64)
-                // Use Array.from to avoid issues with spread operator on large arrays
-                const binaryString = Array.from(param, (byte) => String.fromCharCode(byte)).join("");
-                const base64 = btoa(binaryString);
-                queryParams.push({
-                    type: BINARY,
-                    value: base64,
-                });
+                if (format === TEXT) {
+                    // Inline text parameter from byte array
+                    const textValue = new TextDecoder().decode(param);
+                    queryParams.push({
+                        type: TEXT,
+                        value: textValue,
+                    });
+                } else {
+                    // Inline binary parameter (encode as base64)
+                    const binaryString = Array.from(param, (byte) => String.fromCharCode(byte)).join("");
+                    const base64 = btoa(binaryString);
+                    queryParams.push({
+                        type: BINARY,
+                        value: base64,
+                    });
+                }
             } else {
-                // Extended binary parameter
+                // Extended parameter
                 queryParams.push({
-                    type: BINARY,
+                    type: format,
                     byteSize: byteLength,
                 });
                 extendedFrames.push({
-                    type: BINARY,
+                    type: format,
                     data: param,
                 });
             }
         } else if (isBoundedByteStream(param)) {
+            // Handle BoundedByteStream with explicit format
+            const format = param.format;
             if (param.byteLength <= EXENDED_PARAM_SIZE_THRESHOLD) {
-                // For small bounded streams, read and encode as base64
-                const base64 = await streamToBase64(param);
-                queryParams.push({
-                    type: BINARY,
-                    value: base64,
-                });
+                // For small bounded streams, read and process based on format
+                if (format === TEXT) {
+                    // Decode as text
+                    const chunks: Uint8Array[] = [];
+                    const reader = param.getReader();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        chunks.push(value);
+                    }
+                    const combined = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+                    let offset = 0;
+                    for (const chunk of chunks) {
+                        combined.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+                    const textValue = new TextDecoder().decode(combined);
+                    queryParams.push({
+                        type: TEXT,
+                        value: textValue,
+                    });
+                } else {
+                    // Encode as base64 for binary
+                    const base64 = await streamToBase64(param);
+                    queryParams.push({
+                        type: BINARY,
+                        value: base64,
+                    });
+                }
             } else {
                 queryParams.push({
-                    type: BINARY,
+                    type: format,
                     byteSize: param.byteLength,
                 });
                 extendedFrames.push({
-                    type: BINARY,
+                    type: format,
                     data: param,
                 });
             }

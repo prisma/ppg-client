@@ -1,3 +1,5 @@
+import type { CollectableIterator } from "../common/types.ts";
+
 export type FrameUrn = (typeof FRAME_URNS)[keyof typeof FRAME_URNS];
 export const FRAME_URNS = {
     queryUrn: "urn:prisma:query",
@@ -25,4 +27,9 @@ export interface HttpTransportConfig {
     username: string;
     password: string;
     database?: string;
+}
+
+export interface StatementResponse {
+    readonly columns: { name: string; oid: number }[];
+    readonly rows: CollectableIterator<(string | null)[]>;
 }

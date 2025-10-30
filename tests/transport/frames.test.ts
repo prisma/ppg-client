@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { requestFrames, QueryDescriptorFrame, ExtendedParamFrame } from "../../src/transport/frames";
-import { boundedByteStream } from "../../src/common/types";
+import { boundedByteStream, byteArrayParameter, BINARY, TEXT } from "../../src/common/types";
 
 describe("queryRequest", () => {
     describe("string parameters", () => {
@@ -33,8 +33,18 @@ describe("queryRequest", () => {
 
             const extendedParam = frames[1] as ExtendedParamFrame;
             expect(extendedParam.type).toBe("text");
-            expect(extendedParam.data).toBeInstanceOf(Uint8Array);
-            expect((extendedParam.data as Uint8Array).length).toBe(1025);
+            expect(extendedParam.data).toBeInstanceOf(ReadableStream);
+
+            // Verify the stream content
+            const reader = (extendedParam.data as ReadableStream<Uint8Array>).getReader();
+            const chunks: Uint8Array[] = [];
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+            }
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            expect(totalLength).toBe(1025);
         });
 
         it("should handle multi-byte UTF-8 characters correctly", async () => {
@@ -48,9 +58,9 @@ describe("queryRequest", () => {
         });
     });
 
-    describe("binary parameters (Uint8Array)", () => {
+    describe("binary parameters (ByteArrayParameter)", () => {
         it("should inline small binary data (<= 1KB)", async () => {
-            const smallBinary = new Uint8Array([1, 2, 3, 4, 5]);
+            const smallBinary = byteArrayParameter(new Uint8Array([1, 2, 3, 4, 5]), BINARY);
             const frames = await requestFrames("query", "SELECT $1", [smallBinary]);
 
             expect(frames).toHaveLength(1);
@@ -63,10 +73,11 @@ describe("queryRequest", () => {
         });
 
         it("should create extended param for large binary data (> 1KB)", async () => {
-            const largeBinary = new Uint8Array(1025);
-            for (let i = 0; i < largeBinary.length; i++) {
-                largeBinary[i] = i % 256;
+            const array = new Uint8Array(1025);
+            for (let i = 0; i < array.length; i++) {
+                array[i] = i % 256;
             }
+            const largeBinary = byteArrayParameter(array, BINARY);
 
             const frames = await requestFrames("query", "SELECT $1", [largeBinary]);
 
@@ -85,10 +96,11 @@ describe("queryRequest", () => {
 
         it("should handle binary data with all byte values", async () => {
             // Test all byte values including non-printable characters
-            const allBytes = new Uint8Array(256);
+            const array = new Uint8Array(256);
             for (let i = 0; i < 256; i++) {
-                allBytes[i] = i;
+                array[i] = i;
             }
+            const allBytes = byteArrayParameter(array, BINARY);
 
             const frames = await requestFrames("query", "SELECT $1", [allBytes]);
 
@@ -101,10 +113,41 @@ describe("queryRequest", () => {
             const base64 = (descriptor.parameters![0] as any).value;
             expect(typeof base64).toBe("string");
         });
+
+        it("should handle text format ByteArrayParameter inline", async () => {
+            const textData = new TextEncoder().encode("hello world");
+            const textParam = byteArrayParameter(textData, TEXT);
+            const frames = await requestFrames("query", "SELECT $1", [textParam]);
+
+            expect(frames).toHaveLength(1);
+            const descriptor = frames[0] as QueryDescriptorFrame;
+            expect(descriptor.parameters![0]).toEqual({
+                type: "text",
+                value: "hello world",
+            });
+        });
+
+        it("should handle text format ByteArrayParameter extended", async () => {
+            const longText = "a".repeat(1500);
+            const textData = new TextEncoder().encode(longText);
+            const textParam = byteArrayParameter(textData, TEXT);
+            const frames = await requestFrames("query", "SELECT $1", [textParam]);
+
+            expect(frames).toHaveLength(2);
+            const descriptor = frames[0] as QueryDescriptorFrame;
+            expect(descriptor.parameters![0]).toEqual({
+                type: "text",
+                byteSize: 1500,
+            });
+
+            const extendedParam = frames[1] as ExtendedParamFrame;
+            expect(extendedParam.type).toBe("text");
+            expect(extendedParam.data).toBe(textParam);
+        });
     });
 
     describe("bounded stream parameters", () => {
-        it("should inline small bounded streams (<= 1KB)", async () => {
+        it("should inline small binary bounded streams (<= 1KB)", async () => {
             const data = new Uint8Array([10, 20, 30, 40]);
             const stream = new ReadableStream({
                 start(controller) {
@@ -112,7 +155,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, data.byteLength);
+            const boundedStream = boundedByteStream(stream, BINARY, data.byteLength);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -124,7 +167,28 @@ describe("queryRequest", () => {
             });
         });
 
-        it("should create extended param for large bounded streams (> 1KB)", async () => {
+        it("should inline small text bounded streams (<= 1KB)", async () => {
+            const text = "hello world";
+            const data = new TextEncoder().encode(text);
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(data);
+                    controller.close();
+                }
+            });
+            const boundedStream = boundedByteStream(stream, TEXT, data.byteLength);
+
+            const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
+
+            expect(frames).toHaveLength(1);
+            const descriptor = frames[0] as QueryDescriptorFrame;
+            expect(descriptor.parameters![0]).toEqual({
+                type: "text",
+                value: "hello world",
+            });
+        });
+
+        it("should create extended param for large binary bounded streams (> 1KB)", async () => {
             const largeData = new Uint8Array(2048);
             const stream = new ReadableStream({
                 start(controller) {
@@ -132,7 +196,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, largeData.byteLength);
+            const boundedStream = boundedByteStream(stream, BINARY, largeData.byteLength);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -149,7 +213,33 @@ describe("queryRequest", () => {
             expect(extendedParam.data).toBe(boundedStream);
         });
 
-        it("should handle bounded streams with multiple chunks", async () => {
+        it("should create extended param for large text bounded streams (> 1KB)", async () => {
+            const longText = "x".repeat(2048);
+            const data = new TextEncoder().encode(longText);
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(data);
+                    controller.close();
+                }
+            });
+            const boundedStream = boundedByteStream(stream, TEXT, data.byteLength);
+
+            const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
+
+            expect(frames).toHaveLength(2);
+
+            const descriptor = frames[0] as QueryDescriptorFrame;
+            expect(descriptor.parameters![0]).toEqual({
+                type: "text",
+                byteSize: 2048,
+            });
+
+            const extendedParam = frames[1] as ExtendedParamFrame;
+            expect(extendedParam.type).toBe("text");
+            expect(extendedParam.data).toBe(boundedStream);
+        });
+
+        it("should handle binary bounded streams with multiple chunks", async () => {
             const chunk1 = new Uint8Array([1, 2, 3]);
             const chunk2 = new Uint8Array([4, 5, 6]);
             const stream = new ReadableStream({
@@ -159,7 +249,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, 6);
+            const boundedStream = boundedByteStream(stream, BINARY, 6);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -168,6 +258,30 @@ describe("queryRequest", () => {
             expect(descriptor.parameters![0]).toEqual({
                 type: "binary",
                 value: "AQIDBAUG", // base64 of [1,2,3,4,5,6]
+            });
+        });
+
+        it("should handle text bounded streams with multiple chunks", async () => {
+            const text1 = "hello ";
+            const text2 = "world";
+            const chunk1 = new TextEncoder().encode(text1);
+            const chunk2 = new TextEncoder().encode(text2);
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(chunk1);
+                    controller.enqueue(chunk2);
+                    controller.close();
+                }
+            });
+            const boundedStream = boundedByteStream(stream, TEXT, chunk1.byteLength + chunk2.byteLength);
+
+            const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
+
+            expect(frames).toHaveLength(1);
+            const descriptor = frames[0] as QueryDescriptorFrame;
+            expect(descriptor.parameters![0]).toEqual({
+                type: "text",
+                value: "hello world",
             });
         });
     });
@@ -188,7 +302,7 @@ describe("queryRequest", () => {
     describe("multiple parameters", () => {
         it("should handle mixed parameter types", async () => {
             const shortString = "hello";
-            const binary = new Uint8Array([1, 2, 3]);
+            const binary = byteArrayParameter(new Uint8Array([1, 2, 3]), BINARY);
             const longString = "x".repeat(1500);
 
             const frames = await requestFrames("query",
@@ -211,7 +325,7 @@ describe("queryRequest", () => {
         it("should handle multiple extended parameters", async () => {
             const long1 = "a".repeat(1500);
             const long2 = "b".repeat(2000);
-            const largeBinary = new Uint8Array(1500);
+            const largeBinary = byteArrayParameter(new Uint8Array(1500), BINARY);
 
             const frames = await requestFrames("query",
                 "SELECT $1, $2, $3",
@@ -279,7 +393,7 @@ describe("queryRequest", () => {
         });
 
         it("should handle exactly 1024 byte binary (boundary)", async () => {
-            const binary1024 = new Uint8Array(1024);
+            const binary1024 = byteArrayParameter(new Uint8Array(1024), BINARY);
             const frames = await requestFrames("query", "SELECT $1", [binary1024]);
 
             // Should be inline since it's <= 1024
@@ -300,7 +414,8 @@ describe("queryRequest", () => {
         });
 
         it("should handle empty binary array", async () => {
-            const frames = await requestFrames("query", "SELECT $1", [new Uint8Array(0)]);
+            const emptyBinary = byteArrayParameter(new Uint8Array(0), BINARY);
+            const frames = await requestFrames("query", "SELECT $1", [emptyBinary]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;

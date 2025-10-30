@@ -2,7 +2,7 @@
  * Prisma Postgres low-level Serverless Client API Module.
  */
 
-import type { RawParameter } from "../common/types.ts";
+import type { CollectableIterator, RawParameter } from "../common/types.ts";
 
 /**
  * Creates a new client.
@@ -166,27 +166,7 @@ export interface Resultset {
      * const allRows = await result.rows.collect();
      * ```
      */
-    rows: ResultsetIterator<Row>;
-}
-
-/**
- * Extended async iterator that can collect remaining elements into an array.
- * Useful when you want to stream initially, then collect the rest.
- */
-export interface ResultsetIterator<T> extends AsyncIterableIterator<T> {
-    /**
-     * Collects the remaining (not yet consumed from the iterator) elements into an array.
-     * Once called, further iteration will be empty.
-     *
-     * ```ts
-     * const result = await client.query("SELECT * FROM users");
-     * // Process first row manually
-     * const { value: firstRow } = await result.rows.next();
-     * // Collect the rest
-     * const remainingRows = await result.rows.collect();
-     * ```
-     */
-    collect(): Promise<T[]>;
+    rows: CollectableIterator<Row>;
 }
 
 /**
