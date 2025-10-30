@@ -10,7 +10,10 @@
     "database",
     "client",
     "sql",
-    "serverless"
+    "serverless",
+    "edge",
+    "http",
+    "websocket"
   ],
   "license": "Apache-2.0",
   "type": "module",
@@ -27,6 +30,10 @@
     "build:esm": "tsup src/index.ts --format esm --dts --target esnext --out-dir dist",
     "build:cjs": "tsup src/index.ts --format cjs --target esnext --out-dir dist",
     "format": "biome check --write",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
     "prepack": "pnpm build"
   },
   "files": ["dist"],
@@ -34,7 +41,10 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.15.18",
+    "@vitest/coverage-v8": "^4.0.5",
+    "@vitest/ui": "^4.0.5",
     "tsup": "^8.4.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.5"
   }
 }
