@@ -18,7 +18,7 @@ export default defineConfig({
         "**/*.d.ts",
         "**/example.ts",
       ],
-      // Coverage thresholds (adjust as needed)
+      // Coverage thresholds
       thresholds: {
         lines: 95,
         functions: 95,

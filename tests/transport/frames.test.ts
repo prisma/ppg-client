@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { queryRequest, QueryDescriptorFrame, ExtendedParamFrame } from "../../src/transport/frames";
+import { requestFrames, QueryDescriptorFrame, ExtendedParamFrame } from "../../src/transport/frames";
 import { boundedByteStream } from "../../src/common/types";
 
 describe("queryRequest", () => {
     describe("string parameters", () => {
         it("should inline short strings", async () => {
-            const frames = await queryRequest("SELECT $1", ["hello"]);
+            const frames = await requestFrames("query", "SELECT $1", ["hello"]);
 
             expect(frames).toHaveLength(1);
-            const descriptor = frames[0] as QueryDescriptorFrame;
+            const descriptor = frames[0] as QueryDescriptorFrame & { query: string };
             expect(descriptor.query).toBe("SELECT $1");
             expect(descriptor.parameters).toHaveLength(1);
             expect(descriptor.parameters![0]).toEqual({
@@ -19,11 +19,11 @@ describe("queryRequest", () => {
 
         it("should create extended param for long strings (>1024 bytes)", async () => {
             const longString = "a".repeat(1025);
-            const frames = await queryRequest("SELECT $1", [longString]);
+            const frames = await requestFrames("query", "SELECT $1", [longString]);
 
             expect(frames).toHaveLength(2);
 
-            const descriptor = frames[0] as QueryDescriptorFrame;
+            const descriptor = frames[0] as QueryDescriptorFrame & { query: string };
             expect(descriptor.query).toBe("SELECT $1");
             expect(descriptor.parameters).toHaveLength(1);
             expect(descriptor.parameters![0]).toEqual({
@@ -39,7 +39,7 @@ describe("queryRequest", () => {
 
         it("should handle multi-byte UTF-8 characters correctly", async () => {
             const unicodeString = "🎉".repeat(300); // Each emoji is 4 bytes
-            const frames = await queryRequest("SELECT $1", [unicodeString]);
+            const frames = await requestFrames("query", "SELECT $1", [unicodeString]);
 
             expect(frames).toHaveLength(2);
 
@@ -51,7 +51,7 @@ describe("queryRequest", () => {
     describe("binary parameters (Uint8Array)", () => {
         it("should inline small binary data (<= 1KB)", async () => {
             const smallBinary = new Uint8Array([1, 2, 3, 4, 5]);
-            const frames = await queryRequest("SELECT $1", [smallBinary]);
+            const frames = await requestFrames("query", "SELECT $1", [smallBinary]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;
@@ -68,7 +68,7 @@ describe("queryRequest", () => {
                 largeBinary[i] = i % 256;
             }
 
-            const frames = await queryRequest("SELECT $1", [largeBinary]);
+            const frames = await requestFrames("query", "SELECT $1", [largeBinary]);
 
             expect(frames).toHaveLength(2);
 
@@ -90,7 +90,7 @@ describe("queryRequest", () => {
                 allBytes[i] = i;
             }
 
-            const frames = await queryRequest("SELECT $1", [allBytes]);
+            const frames = await requestFrames("query", "SELECT $1", [allBytes]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;
@@ -114,7 +114,7 @@ describe("queryRequest", () => {
             });
             const boundedStream = boundedByteStream(stream, data.byteLength);
 
-            const frames = await queryRequest("SELECT $1", [boundedStream]);
+            const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;
@@ -134,7 +134,7 @@ describe("queryRequest", () => {
             });
             const boundedStream = boundedByteStream(stream, largeData.byteLength);
 
-            const frames = await queryRequest("SELECT $1", [boundedStream]);
+            const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
             expect(frames).toHaveLength(2);
 
@@ -161,7 +161,7 @@ describe("queryRequest", () => {
             });
             const boundedStream = boundedByteStream(stream, 6);
 
-            const frames = await queryRequest("SELECT $1", [boundedStream]);
+            const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;
@@ -174,7 +174,7 @@ describe("queryRequest", () => {
 
     describe("null parameters", () => {
         it("should handle null values", async () => {
-            const frames = await queryRequest("SELECT $1", [null]);
+            const frames = await requestFrames("query", "SELECT $1", [null]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;
@@ -191,7 +191,7 @@ describe("queryRequest", () => {
             const binary = new Uint8Array([1, 2, 3]);
             const longString = "x".repeat(1500);
 
-            const frames = await queryRequest(
+            const frames = await requestFrames("query",
                 "SELECT $1, $2, $3",
                 [shortString, binary, longString]
             );
@@ -213,7 +213,7 @@ describe("queryRequest", () => {
             const long2 = "b".repeat(2000);
             const largeBinary = new Uint8Array(1500);
 
-            const frames = await queryRequest(
+            const frames = await requestFrames("query",
                 "SELECT $1, $2, $3",
                 [long1, long2, largeBinary]
             );
@@ -234,10 +234,10 @@ describe("queryRequest", () => {
 
     describe("no parameters", () => {
         it("should handle query with no parameters", async () => {
-            const frames = await queryRequest("SELECT * FROM users", []);
+            const frames = await requestFrames("query", "SELECT * FROM users", []);
 
             expect(frames).toHaveLength(1);
-            const descriptor = frames[0] as QueryDescriptorFrame;
+            const descriptor = frames[0] as QueryDescriptorFrame & { query: string };
             expect(descriptor.query).toBe("SELECT * FROM users");
             expect(descriptor.parameters).toBeUndefined();
         });
@@ -247,22 +247,22 @@ describe("queryRequest", () => {
         it("should throw error for unsupported parameter types", async () => {
             // Test with number
             await expect(
-                queryRequest("SELECT $1", [123 as any])
+                requestFrames("query", "SELECT $1", [123 as any])
             ).rejects.toThrow("unsupported raw parameter type");
 
             // Test with boolean
             await expect(
-                queryRequest("SELECT $1", [true as any])
+                requestFrames("query", "SELECT $1", [true as any])
             ).rejects.toThrow("unsupported raw parameter type");
 
             // Test with object
             await expect(
-                queryRequest("SELECT $1", [{ key: "value" } as any])
+                requestFrames("query", "SELECT $1", [{ key: "value" } as any])
             ).rejects.toThrow("unsupported raw parameter type");
 
             // Test with array
             await expect(
-                queryRequest("SELECT $1", [[1, 2, 3] as any])
+                requestFrames("query", "SELECT $1", [[1, 2, 3] as any])
             ).rejects.toThrow("unsupported raw parameter type");
         });
     });
@@ -270,7 +270,7 @@ describe("queryRequest", () => {
     describe("edge cases", () => {
         it("should handle exactly 1024 byte string (boundary)", async () => {
             const string1024 = "a".repeat(1024);
-            const frames = await queryRequest("SELECT $1", [string1024]);
+            const frames = await requestFrames("query", "SELECT $1", [string1024]);
 
             // Should be inline since it's <= 1024
             expect(frames).toHaveLength(1);
@@ -280,7 +280,7 @@ describe("queryRequest", () => {
 
         it("should handle exactly 1024 byte binary (boundary)", async () => {
             const binary1024 = new Uint8Array(1024);
-            const frames = await queryRequest("SELECT $1", [binary1024]);
+            const frames = await requestFrames("query", "SELECT $1", [binary1024]);
 
             // Should be inline since it's <= 1024
             expect(frames).toHaveLength(1);
@@ -289,7 +289,7 @@ describe("queryRequest", () => {
         });
 
         it("should handle empty string", async () => {
-            const frames = await queryRequest("SELECT $1", [""]);
+            const frames = await requestFrames("query", "SELECT $1", [""]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;
@@ -300,7 +300,7 @@ describe("queryRequest", () => {
         });
 
         it("should handle empty binary array", async () => {
-            const frames = await queryRequest("SELECT $1", [new Uint8Array(0)]);
+            const frames = await requestFrames("query", "SELECT $1", [new Uint8Array(0)]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;
@@ -308,6 +308,68 @@ describe("queryRequest", () => {
                 type: "binary",
                 value: "",
             });
+        });
+    });
+
+    describe("exec kind", () => {
+        it("should create exec frame for INSERT statements", async () => {
+            const frames = await requestFrames("exec", "INSERT INTO users (name, email) VALUES ($1, $2)", ["John Doe", "john@example.com"]);
+
+            expect(frames).toHaveLength(1);
+            const descriptor = frames[0] as QueryDescriptorFrame;
+
+            // Verify it has exec property, not query
+            expect(descriptor).toHaveProperty("exec", "INSERT INTO users (name, email) VALUES ($1, $2)");
+            expect(descriptor).not.toHaveProperty("query");
+
+            expect(descriptor.parameters).toHaveLength(2);
+            expect(descriptor.parameters![0]).toEqual({
+                type: "text",
+                value: "John Doe",
+            });
+            expect(descriptor.parameters![1]).toEqual({
+                type: "text",
+                value: "john@example.com",
+            });
+        });
+
+        it("should create exec frame for UPDATE statements", async () => {
+            const frames = await requestFrames("exec", "UPDATE users SET name = $1 WHERE id = $2", ["Jane Doe", "123"]);
+
+            expect(frames).toHaveLength(1);
+            const descriptor = frames[0] as QueryDescriptorFrame;
+
+            expect(descriptor).toHaveProperty("exec", "UPDATE users SET name = $1 WHERE id = $2");
+            expect(descriptor).not.toHaveProperty("query");
+            expect(descriptor.parameters).toHaveLength(2);
+        });
+
+        it("should create exec frame for DELETE statements", async () => {
+            const frames = await requestFrames("exec", "DELETE FROM users WHERE id = $1", ["456"]);
+
+            expect(frames).toHaveLength(1);
+            const descriptor = frames[0] as QueryDescriptorFrame;
+
+            expect(descriptor).toHaveProperty("exec", "DELETE FROM users WHERE id = $1");
+            expect(descriptor).not.toHaveProperty("query");
+            expect(descriptor.parameters).toHaveLength(1);
+        });
+
+        it("should handle exec with large parameters", async () => {
+            const largeText = "x".repeat(2000);
+            const frames = await requestFrames("exec", "INSERT INTO documents (content) VALUES ($1)", [largeText]);
+
+            expect(frames).toHaveLength(2);
+
+            const descriptor = frames[0] as QueryDescriptorFrame;
+            expect(descriptor).toHaveProperty("exec");
+            expect(descriptor.parameters![0]).toEqual({
+                type: "text",
+                byteSize: 2000,
+            });
+
+            const extendedParam = frames[1] as ExtendedParamFrame;
+            expect(extendedParam.type).toBe("text");
         });
     });
 });

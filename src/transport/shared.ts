@@ -1,5 +1,3 @@
-
-
 export type FrameUrn = (typeof FRAME_URNS)[keyof typeof FRAME_URNS];
 export const FRAME_URNS = {
     queryUrn: "urn:prisma:query",

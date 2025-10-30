@@ -24,10 +24,16 @@ export type ExtendedQueryParameter = {
 
 export type QueryParameter = InlineQueryParameter | ExtendedQueryParameter;
 
-export type QueryDescriptorFrame = {
-    query: string;
-    parameters?: QueryParameter[];
-};
+export type StatementKind = "query" | "exec";
+export type QueryDescriptorFrame =
+    | {
+          query: string;
+          parameters?: QueryParameter[];
+      }
+    | {
+          exec: string;
+          parameters?: QueryParameter[];
+      };
 
 export type ExtendedParamFrame = {
     type: ParameterFormat;
@@ -96,12 +102,16 @@ async function streamToBase64(stream: ReadableStream<Uint8Array>): Promise<strin
     return btoa(binaryString);
 }
 
-export async function queryRequest(sql: string, parameters: RawParameter[]): Promise<RequestFrame[]> {
+export async function requestFrames(
+    kind: StatementKind,
+    sql: string,
+    rawParams: RawParameter[],
+): Promise<RequestFrame[]> {
     const queryParams: QueryParameter[] = [];
     const extendedFrames: ExtendedParamFrame[] = [];
 
     // Process each parameter
-    for (const param of parameters) {
+    for (const param of rawParams) {
         if (typeof param === "string") {
             // Handle string parameters
             const data = new TextEncoder().encode(param);
@@ -174,11 +184,10 @@ export async function queryRequest(sql: string, parameters: RawParameter[]): Pro
         }
     }
 
-    // Create query descriptor frame
-    const queryDescriptor: QueryDescriptorFrame = {
-        query: sql,
-        parameters: queryParams.length > 0 ? queryParams : undefined,
-    };
+    const parameters = queryParams.length > 0 ? queryParams : undefined;
+
+    const queryDescriptor: QueryDescriptorFrame =
+        kind === "query" ? { query: sql, parameters } : { exec: sql, parameters };
 
     return [queryDescriptor, ...extendedFrames];
 }
