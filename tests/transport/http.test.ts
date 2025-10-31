@@ -1,7 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { httpTransport } from "../../src/transport/http";
 import { MockHttpServer } from "./http-test-utils";
-import { BINARY, TEXT, boundedByteStream, byteArrayParameter } from "../../src/common/types";
+import { BINARY, TEXT, boundedByteStreamParameter, byteArrayParameter } from "../../src/common/types";
 
 
 describe("HTTP Transport", () => {
@@ -464,7 +464,7 @@ describe("HTTP Transport", () => {
                 }
             });
 
-            const textStream = boundedByteStream(stream, TEXT, textData.byteLength);
+            const textStream = boundedByteStreamParameter(stream, TEXT, textData.byteLength);
 
             mockServer
                 .expectQueryDescriptor({ kind: 'query', sql: 'SELECT $1', parameterCount: 1 })
@@ -521,7 +521,7 @@ describe("HTTP Transport", () => {
             });
 
             // Create bounded stream
-            const boundedStream = boundedByteStream(stream, BINARY, data.byteLength);
+            const boundedStream = boundedByteStreamParameter(stream, BINARY, data.byteLength);
 
             mockServer
                 .expectQueryDescriptor({ kind: 'query', sql: 'SELECT $1', parameterCount: 1 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toCollectableIterator, boundedByteStream, isBoundedByteStream, BINARY } from "../../src/common/types";
+import { toCollectableIterator, boundedByteStreamParameter, isBoundedByteStreamParameter, BINARY } from "../../src/common/types";
 
 describe("CollectableIterator", () => {
     describe("Basic Iteration", () => {
@@ -423,7 +423,7 @@ describe("BoundedByteStream", () => {
                 }
             });
 
-            const bounded = boundedByteStream(stream, BINARY, 3);
+            const bounded = boundedByteStreamParameter(stream, BINARY, 3);
 
             expect(bounded.byteLength).toBe(3);
             expect(bounded instanceof ReadableStream).toBe(true);
@@ -438,7 +438,7 @@ describe("BoundedByteStream", () => {
                 }
             });
 
-            const bounded = boundedByteStream(stream, BINARY, data.byteLength);
+            const bounded = boundedByteStreamParameter(stream, BINARY, data.byteLength);
             const reader = bounded.getReader();
             const result = await reader.read();
 
@@ -449,32 +449,32 @@ describe("BoundedByteStream", () => {
     describe("isBoundedByteStream()", () => {
         it("should return true for BoundedByteStream", () => {
             const stream = new ReadableStream<Uint8Array>();
-            const bounded = boundedByteStream(stream, BINARY, 100);
+            const bounded = boundedByteStreamParameter(stream, BINARY, 100);
 
-            expect(isBoundedByteStream(bounded)).toBe(true);
+            expect(isBoundedByteStreamParameter(bounded)).toBe(true);
         });
 
         it("should return false for regular ReadableStream", () => {
             const stream = new ReadableStream<Uint8Array>();
 
-            expect(isBoundedByteStream(stream)).toBe(false);
+            expect(isBoundedByteStreamParameter(stream)).toBe(false);
         });
 
         it("should return false for non-ReadableStream objects", () => {
-            expect(isBoundedByteStream(null)).toBe(false);
-            expect(isBoundedByteStream(undefined)).toBe(false);
-            expect(isBoundedByteStream({})).toBe(false);
-            expect(isBoundedByteStream({ byteLength: 100 })).toBe(false);
-            expect(isBoundedByteStream([])).toBe(false);
-            expect(isBoundedByteStream("string")).toBe(false);
-            expect(isBoundedByteStream(123)).toBe(false);
+            expect(isBoundedByteStreamParameter(null)).toBe(false);
+            expect(isBoundedByteStreamParameter(undefined)).toBe(false);
+            expect(isBoundedByteStreamParameter({})).toBe(false);
+            expect(isBoundedByteStreamParameter({ byteLength: 100 })).toBe(false);
+            expect(isBoundedByteStreamParameter([])).toBe(false);
+            expect(isBoundedByteStreamParameter("string")).toBe(false);
+            expect(isBoundedByteStreamParameter(123)).toBe(false);
         });
 
         it("should return false for ReadableStream with non-number byteLength", () => {
             const stream = new ReadableStream<Uint8Array>();
             const invalid = Object.assign(stream, { byteLength: "not a number" });
 
-            expect(isBoundedByteStream(invalid)).toBe(false);
+            expect(isBoundedByteStreamParameter(invalid)).toBe(false);
         });
     });
 });

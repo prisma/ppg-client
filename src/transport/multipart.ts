@@ -1,4 +1,4 @@
-import { isByteArrayParameter, isBoundedByteStream } from "../common/types";
+import { isByteArrayParameter, isBoundedByteStreamParameter } from "../common/types";
 import { RequestFrame, isQueryDescriptorFrame, isExtendedParamFrame } from "./frames";
 import { FRAME_URNS, MIME_TYPES } from "./shared";
 
@@ -43,7 +43,7 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                         // Text encoded as Uint8Array (from ByteArrayParameter with TEXT format)
                         yield param;
                         yield textEncoder.encode("\r\n");
-                    } else if (isBoundedByteStream(param)) {
+                    } else if (isBoundedByteStreamParameter(param)) {
                         // Stream the data (from BoundedByteStream with TEXT format or string via TextEncoderStream)
                         const reader = param.getReader();
                         try {
@@ -75,7 +75,7 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                     } else if (isByteArrayParameter(extendedParam.data)) {
                         yield extendedParam.data;
                         yield textEncoder.encode("\r\n");
-                    } else if (isBoundedByteStream(extendedParam.data)) {
+                    } else if (isBoundedByteStreamParameter(extendedParam.data)) {
                         // Stream the data
                         const reader = extendedParam.data.getReader();
                         try {

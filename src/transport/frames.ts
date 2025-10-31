@@ -7,9 +7,9 @@ import {
     type ParameterFormat,
     type RawParameter,
     TEXT,
-    isBoundedByteStream,
+    isBoundedByteStreamParameter,
     isByteArrayParameter,
-    boundedByteStream,
+    boundedByteStreamParameter,
 } from "../common/types.ts";
 import { utf8ByteLength } from "./shims.ts";
 
@@ -170,7 +170,7 @@ export async function requestFrames(
                 const encoderStream = new TextEncoderStream();
                 const encodedStream = stringStream.pipeThrough(encoderStream);
                 // Wrap as BoundedByteStream to include format and byteLength metadata
-                const boundedStream = boundedByteStream(encodedStream, TEXT, byteLength);
+                const boundedStream = boundedByteStreamParameter(encodedStream, TEXT, byteLength);
 
                 extendedFrames.push({
                     type: TEXT,
@@ -210,7 +210,7 @@ export async function requestFrames(
                     data: param,
                 });
             }
-        } else if (isBoundedByteStream(param)) {
+        } else if (isBoundedByteStreamParameter(param)) {
             // Handle BoundedByteStream with explicit format
             const format = param.format;
             if (param.byteLength <= EXENDED_PARAM_SIZE_THRESHOLD) {

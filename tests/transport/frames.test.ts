@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { requestFrames, QueryDescriptorFrame, ExtendedParamFrame } from "../../src/transport/frames";
-import { boundedByteStream, byteArrayParameter, BINARY, TEXT } from "../../src/common/types";
+import { boundedByteStreamParameter, byteArrayParameter, BINARY, TEXT } from "../../src/common/types";
 
 describe("queryRequest", () => {
     describe("string parameters", () => {
@@ -155,7 +155,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, BINARY, data.byteLength);
+            const boundedStream = boundedByteStreamParameter(stream, BINARY, data.byteLength);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -176,7 +176,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, TEXT, data.byteLength);
+            const boundedStream = boundedByteStreamParameter(stream, TEXT, data.byteLength);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -196,7 +196,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, BINARY, largeData.byteLength);
+            const boundedStream = boundedByteStreamParameter(stream, BINARY, largeData.byteLength);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -222,7 +222,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, TEXT, data.byteLength);
+            const boundedStream = boundedByteStreamParameter(stream, TEXT, data.byteLength);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -249,7 +249,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, BINARY, 6);
+            const boundedStream = boundedByteStreamParameter(stream, BINARY, 6);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 
@@ -273,7 +273,7 @@ describe("queryRequest", () => {
                     controller.close();
                 }
             });
-            const boundedStream = boundedByteStream(stream, TEXT, chunk1.byteLength + chunk2.byteLength);
+            const boundedStream = boundedByteStreamParameter(stream, TEXT, chunk1.byteLength + chunk2.byteLength);
 
             const frames = await requestFrames("query", "SELECT $1", [boundedStream]);
 

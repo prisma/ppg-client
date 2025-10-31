@@ -3,12 +3,12 @@ export const BINARY = "binary",
 
 export type ParameterFormat = typeof BINARY | typeof TEXT;
 
-export interface BoundedByteStream extends ReadableStream<Uint8Array> {
+export interface BoundedByteStreamParameter extends ReadableStream<Uint8Array> {
     readonly byteLength: number;
     readonly format: ParameterFormat;
 }
 
-export function boundedByteStream(
+export function boundedByteStreamParameter(
     readableStream: ReadableStream<Uint8Array>,
     format: ParameterFormat,
     byteLength: number,
@@ -16,7 +16,7 @@ export function boundedByteStream(
     return Object.assign(readableStream, { byteLength, format });
 }
 
-export function isBoundedByteStream(x: unknown): x is BoundedByteStream {
+export function isBoundedByteStreamParameter(x: unknown): x is BoundedByteStreamParameter {
     return x instanceof ReadableStream && "byteLength" in x && typeof x.byteLength === "number" && hasFormat(x);
 }
 
@@ -36,7 +36,7 @@ export function isByteArrayParameter(x: unknown): x is ByteArrayParameter {
     return x instanceof Uint8Array && hasFormat(x);
 }
 
-export type RawParameter = string | null | ByteArrayParameter | BoundedByteStream;
+export type RawParameter = string | null | ByteArrayParameter | BoundedByteStreamParameter;
 
 /**
  * Extended async iterator that can collect remaining elements into an array.

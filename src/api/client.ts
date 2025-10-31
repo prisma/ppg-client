@@ -135,8 +135,8 @@ export interface Session extends Queryable, AsyncDisposable {
  *
  * - `string`: Text data
  * - `null`: SQL NULL value
- * - `Uint8Array`: Binary data
- * - `ReadableStream<Uint8Array>`: Streamed binary data
+ * - `ByteArrayParameter`: Fixed size byte array, carrying text or binary data
+ * - `BoundedByteStreamParameter`: Streamed text or binary data, with a predetermined length
  */
 export type QueryParameter = RawParameter;
 

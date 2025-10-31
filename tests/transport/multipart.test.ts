@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { createMultipartStream } from "../../src/transport/multipart";
-import { byteArrayParameter, boundedByteStream, BINARY, TEXT } from "../../src/common/types";
+import { byteArrayParameter, boundedByteStreamParameter, BINARY, TEXT } from "../../src/common/types";
 import { RequestFrame } from "../../src/transport/frames";
 
 describe("createMultipartStream", () => {
@@ -116,7 +116,7 @@ describe("createMultipartStream", () => {
                 }
             });
 
-            const stream = boundedByteStream(readableStream, TEXT, textData.byteLength);
+            const stream = boundedByteStreamParameter(readableStream, TEXT, textData.byteLength);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: textData.byteLength }] },
@@ -140,7 +140,7 @@ describe("createMultipartStream", () => {
                 }
             });
 
-            const stream = boundedByteStream(readableStream, BINARY, binaryData.byteLength);
+            const stream = boundedByteStreamParameter(readableStream, BINARY, binaryData.byteLength);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "binary", byteSize: binaryData.byteLength }] },
@@ -223,7 +223,7 @@ describe("createMultipartStream", () => {
                 }
             });
 
-            const stream = boundedByteStream(errorStream, TEXT, 10);
+            const stream = boundedByteStreamParameter(errorStream, TEXT, 10);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: 10 }] },
@@ -252,7 +252,7 @@ describe("createMultipartStream", () => {
                 },
             });
 
-            const stream = boundedByteStream(readableStream, TEXT, textData.byteLength);
+            const stream = boundedByteStreamParameter(readableStream, TEXT, textData.byteLength);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: textData.byteLength }] },
@@ -323,7 +323,7 @@ describe("createMultipartStream", () => {
             });
 
             const totalLength = chunk1.byteLength + chunk2.byteLength + chunk3.byteLength;
-            const stream = boundedByteStream(readableStream, TEXT, totalLength);
+            const stream = boundedByteStreamParameter(readableStream, TEXT, totalLength);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: totalLength }] },
