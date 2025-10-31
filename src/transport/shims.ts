@@ -9,7 +9,7 @@ export interface Deferred<T> {
 }
 
 export async function* emptyIterableIterator<T>(): AsyncIterableIterator<T> {
-  // no yield → immediately done
+    // no yield → immediately done
 }
 
 /**

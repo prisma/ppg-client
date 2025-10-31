@@ -10,10 +10,8 @@ export interface WsTransportConnection {
     close(): void;
 }
 
-type Timeout = ReturnType<typeof setTimeout>;
-
 const WS_REQUEST_PATH = "/db/websocket";
-const WS_SUBPROTOCOL = "prisma-postgres:1.0";
+const WS_SUBPROTOCOL = "prisma-postgres-1.0";
 const AUTH_TIMEOUT_MS = 5000;
 const MAX_BACKOFF_MS = 100;
 
@@ -32,7 +30,6 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
 
     // Authentication state
     const authDeferred = createDeferred<WsTransportConnection>();
-    let authTimeout: Timeout;
 
     // Query queue tracks response ordering only
     const queryQueue = newQueryQueue();
@@ -50,29 +47,27 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
     // Handle connection open
     ws.onopen = () => {
         ws.send(JSON.stringify(authFrame));
-
-        authTimeout = setTimeout(() => {
-            authDeferred.reject(new Error("Authentication timeout"));
-            ws.close();
-        }, AUTH_TIMEOUT_MS);
+        authDeferred.resolve(conn);
     };
 
     // Handle incoming messages
     ws.onmessage = (event) => {
-        // First message after sending auth = authentication succeeded
-        if (queryQueue.isEmpty()) {
-            clearTimeout(authTimeout);
-            authDeferred.resolve(conn);
+        // Validate that we only receive text messages (not binary)
+        if (typeof event.data !== "string") {
+            const error = new Error(`Protocol error: expected text message, received ${typeof event.data}`);
+            queryQueue.abortAll(error);
+            ws.close(1002, "Protocol error: binary messages not supported");
+            return;
         }
 
         if (expectingUrn) {
-            currentUrn = event.data as string;
+            currentUrn = event.data;
             expectingUrn = false;
             return;
         }
 
-        // Parse payload
-        const payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        // Parse payload (we know it's a string from the check above)
+        const payload = JSON.parse(event.data);
 
         queryQueue.processFrame(currentUrn!, payload);
         currentUrn = null;
@@ -85,16 +80,13 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
         const errorMsg = "message" in event ? String(event.message) : "WebSocket error";
         const error = new Error(errorMsg);
 
-        if (queryQueue.isEmpty()) {
-            authDeferred.reject(error);
-        } else {
-            queryQueue.abortAll(error);
-        }
+        authDeferred.reject(error);
+        queryQueue.abortAll(error);
     };
 
     // Handle connection close
     ws.onclose = (event) => {
-        clearTimeout(authTimeout);
+        authDeferred.resolve(conn);
         const closeError = new Error(`WebSocket connection closed: ${event.code} - ${event.reason}`);
 
         if (queryQueue.isEmpty()) {

@@ -1,7 +1,16 @@
-import { ColumnMetadata, DataRow, DataRowDescription, ErrorFrame, isCommandComplete, isDataRow, isDataRowDescription, isErrorFrame } from "./frames.ts";
+import { type CollectableIterator, toCollectableIterator } from "../common/types.ts";
+import {
+    ColumnMetadata,
+    type DataRow,
+    type DataRowDescription,
+    type ErrorFrame,
+    isCommandComplete,
+    isDataRow,
+    isDataRowDescription,
+    isErrorFrame,
+} from "./frames.ts";
 import { FRAME_URNS, type StatementResponse } from "./shared.ts";
 import { type Deferred, createDeferred, emptyIterableIterator } from "./shims.ts";
-import { toCollectableIterator, type CollectableIterator } from "../common/types.ts";
 
 type RowIteratorResult = IteratorResult<(string | null)[]>;
 
@@ -32,7 +41,7 @@ function newRunningQuery(): RunningQuery {
     const rowBuffer: (string | null)[][] = []; // Buffer for rows that arrive before iteration starts or while the consumer is busy
     let completed = false;
     let rowDeferred: Deferred<RowIteratorResult> | null;
-    let columns: { name: string; oid: number }[] = []
+    let columns: { name: string; oid: number }[] = [];
 
     function tryResolveRow(value: RowIteratorResult) {
         if (rowDeferred) {
@@ -108,15 +117,14 @@ function newRunningQuery(): RunningQuery {
         completed = true;
 
         // If someone is currently waiting for next row, signal completion
-        tryResolveRow({ value: undefined, done: true })
+        tryResolveRow({ value: undefined, done: true });
 
         // Resolve the promise if it hasn't been resolved yet
         // (happens when there's no DataRowDescription, e.g., INSERT/UPDATE)
         statementDeferred.resolve({
             columns: columns,
-            rows: toCollectableIterator(emptyIterableIterator())
+            rows: toCollectableIterator(emptyIterableIterator()),
         });
-
     }
 
     function abort(err: Error) {
@@ -126,11 +134,13 @@ function newRunningQuery(): RunningQuery {
     }
 
     return {
-        rowDescription, dataRow,
-        error, complete,
+        rowDescription,
+        dataRow,
+        error,
+        complete,
         abort,
-        statementPromise: statementDeferred.promise
-    }
+        statementPromise: statementDeferred.promise,
+    };
 }
 
 export function newQueryQueue(): QueryQueue {
@@ -138,13 +148,12 @@ export function newQueryQueue(): QueryQueue {
     const queryQueue: RunningQuery[] = [];
 
     function enqueueNew(): EnqueuedQuery {
-
         const query = newRunningQuery();
         queryQueue.push(query);
 
         return {
             promise: query.statementPromise,
-            abort: query.abort
+            abort: query.abort,
         };
     }
 
@@ -154,12 +163,12 @@ export function newQueryQueue(): QueryQueue {
         const currentQuery = queryQueue[0];
 
         if (urn === FRAME_URNS.dataRowDescriptionUrn && isDataRowDescription(payload)) {
-            currentQuery.rowDescription(payload)
+            currentQuery.rowDescription(payload);
         } else if (urn === FRAME_URNS.dataRowUrn && isDataRow(payload)) {
-            currentQuery.dataRow(payload)
+            currentQuery.dataRow(payload);
         } else if (urn === FRAME_URNS.commandCompleteUrn && isCommandComplete(payload)) {
             currentQuery.complete();
-            // Remove from queue - this query is done. 
+            // Remove from queue - this query is done.
             // Even with pipelining, results will **always** follow the FIFO ordering.
             queryQueue.shift();
         } else if (urn === FRAME_URNS.errorUrn && isErrorFrame(payload)) {
@@ -168,16 +177,15 @@ export function newQueryQueue(): QueryQueue {
         } else {
             // Protocol violation: received unexpected frame type
             // This is critical - abort all queries as the connection is in an invalid state
-            const protocolError = new Error(
-                `Protocol error: unexpected frame URN '${urn}' for current query state`
-            );
+            const protocolError = new Error(`Protocol error: unexpected frame URN '${urn}' for current query state`);
             abortAll(protocolError);
         }
-
     }
 
     function abortAll(error: Error) {
-        queryQueue.forEach(q => q.abort(error));
+        for (const q of queryQueue) {
+            q.abort(error);
+        }
         queryQueue.length = 0;
     }
 
