@@ -27,6 +27,7 @@ export interface HttpTransportConfig {
     username: string;
     password: string;
     database?: string;
+    keepalive?: boolean;
 }
 
 export interface StatementResponse {

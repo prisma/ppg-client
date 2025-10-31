@@ -32,30 +32,39 @@ export function httpTransport(config: HttpTransportConfig): HttpTransport {
         };
 
         // Delegate to request() for multipart encoding and response parsing
-        return request(url.toString(), headers, frames);
+        return request({ url: url.toString(), headers, frames, keepalive: config.keepalive ?? false });
     }
 
     return { statement };
 }
 
-// TODO: keepalive (?)
+interface QueryHttpRequest {
+    url: string
+    headers: Record<string, string>
+    frames: RequestFrame[]
+    keepalive: boolean
+}
 
-async function request(url: string, headers: Record<string, string>, req: RequestFrame[]): Promise<StatementResponse> {
+async function request({ headers, keepalive, frames, url }: QueryHttpRequest): Promise<StatementResponse> {
     // Generate a unique boundary for multipart/form-data
     const boundary = `----PPGBoundary${Date.now()}${Math.random().toString(36).substring(2)}`;
 
     // Create a ReadableStream from the multipart generator
-    const bodyStream = createMultipartStream(req, boundary);
+    const bodyStream = createMultipartStream(frames, boundary);
 
-    // Make the HTTP request
-    const response = await fetch(url, {
+    const requestInit = {
         method: "POST",
         headers: {
             ...headers,
             "Content-Type": `${MIME_TYPES.multipartFormData}; profile="${FRAME_URNS.queryUrn}"; boundary=${boundary}`,
         },
         body: bodyStream,
-    });
+        duplex: 'half',
+        keepalive, // node doesn't seem to support it, throws a TypeError when this is true
+    }
+
+    // Make the HTTP request
+    const response = await fetch(url, requestInit);
 
     if (!response.ok) {
         throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
