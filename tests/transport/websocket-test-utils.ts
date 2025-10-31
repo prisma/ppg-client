@@ -65,6 +65,10 @@ export class MockWebSocket {
     }
 }
 
+export function nextTick() {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 /**
  * Creates a mock setup for testing WebSocket connections
  * Returns the current mock instance for test assertions

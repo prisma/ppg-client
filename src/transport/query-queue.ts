@@ -1,3 +1,4 @@
+import { DatabaseError } from "../api/client.ts";
 import { type CollectableIterator, toCollectableIterator } from "../common/types.ts";
 import {
     ColumnMetadata,
@@ -107,8 +108,7 @@ function newRunningQuery(): RunningQuery {
     }
 
     function error({ error }: ErrorFrame) {
-        // TODO: improve errors to carry more details
-        const err = new Error(`Database error: ${error.message}`);
+        const err = new DatabaseError(error.message, error.code, error);
         abort(err);
     }
 

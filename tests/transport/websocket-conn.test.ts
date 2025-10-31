@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
-import { MockWebSocket, createMockWebSocketSetup } from "./websocket-test-utils.ts";
+import { MockWebSocket, createMockWebSocketSetup, nextTick } from "./websocket-test-utils.ts";
 
 // Setup mock WebSocket
 const mockWsSetup = createMockWebSocketSetup();
@@ -56,7 +56,7 @@ describe("wsTransportConnection", () => {
         it("should construct correct WebSocket URL", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             expect(getMockWs().url).toBe("ws://localhost:3000/db/websocket");
             expect(getMockWs().protocol).toBe("prisma-postgres-1.0");
@@ -72,7 +72,7 @@ describe("wsTransportConnection", () => {
             };
 
             const connPromise = wsTransportConnection(config);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             expect(getMockWs().url).toContain("database=mydb");
 
@@ -81,7 +81,7 @@ describe("wsTransportConnection", () => {
 
         it("should set binary type to arraybuffer", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             expect(getMockWs().binaryType).toBe("arraybuffer");
 
@@ -92,7 +92,7 @@ describe("wsTransportConnection", () => {
     describe("authentication", () => {
         it("should send authentication frame on open", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             expect(getMockWs().sentMessages.length).toBe(1);
             const authFrame = JSON.parse(getMockWs().sentMessages[0]);
@@ -106,7 +106,7 @@ describe("wsTransportConnection", () => {
 
         it("should resolve when first message is received", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             // Simulate authentication success
 
@@ -121,7 +121,7 @@ describe("wsTransportConnection", () => {
     describe("message parsing", () => {
         it("should parse URN + payload message pattern", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -144,7 +144,7 @@ describe("wsTransportConnection", () => {
 
         it("should handle multiple messages in sequence", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -162,17 +162,17 @@ describe("wsTransportConnection", () => {
                 return await response.rows.collect();
             })();
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             getMockWs().simulateMessage(FRAME_URNS.dataRowUrn);
             getMockWs().simulateMessage(JSON.stringify({ values: ["1"] }));
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             getMockWs().simulateMessage(FRAME_URNS.dataRowUrn);
             getMockWs().simulateMessage(JSON.stringify({ values: ["2"] }));
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             getMockWs().simulateMessage(FRAME_URNS.commandCompleteUrn);
             getMockWs().simulateMessage(JSON.stringify({ complete: true }));
@@ -185,7 +185,7 @@ describe("wsTransportConnection", () => {
     describe("error handling", () => {
         it("should reject binary messages and abort all queries", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -212,7 +212,7 @@ describe("wsTransportConnection", () => {
 
         it("should abort all queries on WebSocket error after auth", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -227,7 +227,7 @@ describe("wsTransportConnection", () => {
 
         it("should handle WebSocket error without message property", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -244,7 +244,7 @@ describe("wsTransportConnection", () => {
 
         it("should handle error frame from server", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -255,14 +255,14 @@ describe("wsTransportConnection", () => {
                 error: { message: "syntax error", code: "42601" },
             }));
 
-            await expect(query.promise).rejects.toThrow("Database error: syntax error");
+            await expect(query.promise).rejects.toThrow("syntax error");
         });
     });
 
     describe("close handling", () => {
         it("should abort all queries on close after auth", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -277,7 +277,7 @@ describe("wsTransportConnection", () => {
 
         it("should close connection with normal closure code", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -292,7 +292,7 @@ describe("wsTransportConnection", () => {
     describe("send with backpressure", () => {
         it("should send data when not busy", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -372,7 +372,7 @@ describe("wsTransportConnection", () => {
         it("should actually wait in the while loop (real timers for coverage)", async () => {
             // This test uses real timers to ensure coverage tools see the while loop execute
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -396,7 +396,7 @@ describe("wsTransportConnection", () => {
     describe("isReady()", () => {
         it("should return true when connection is open", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 
@@ -405,7 +405,7 @@ describe("wsTransportConnection", () => {
 
         it("should return false when connection is closed", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             const conn = await connPromise;
 

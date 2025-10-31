@@ -117,7 +117,7 @@ describe("parseNDJSONResponse", () => {
 
             const result = await parseNDJSONResponse(response);
 
-            await expect(result.rows.collect()).rejects.toThrow("Database error: division by zero");
+            await expect(result.rows.collect()).rejects.toThrow("division by zero");
         });
 
         it("should handle ErrorFrame with additional error details", async () => {
@@ -129,7 +129,7 @@ describe("parseNDJSONResponse", () => {
 
             const result = await parseNDJSONResponse(response);
 
-            await expect(result.rows.collect()).rejects.toThrow('Database error: syntax error');
+            await expect(result.rows.collect()).rejects.toThrow('syntax error');
         });
 
         it("should silently ignore unsupported frame types", async () => {
@@ -316,7 +316,7 @@ describe("parseNDJSONResponse", () => {
 
             const result = await parseNDJSONResponse(response);
 
-            await expect(result.rows.collect()).rejects.toThrow("Database error: test error");
+            await expect(result.rows.collect()).rejects.toThrow("test error");
 
             // If we get here without hanging, the lock was properly released
             expect(true).toBe(true);

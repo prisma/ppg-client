@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { newQueryQueue } from "../../src/transport/query-queue.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
 import type { DataRowDescription, DataRow, CommandComplete, ErrorFrame } from "../../src/transport/frames.ts";
+import { nextTick } from "./websocket-test-utils.ts";
 
 describe("QueryQueue", () => {
     describe("isEmpty()", () => {
@@ -109,7 +110,7 @@ describe("QueryQueue", () => {
 
             queue.processFrame(FRAME_URNS.errorUrn, errorFrame);
 
-            await expect(enqueued.promise).rejects.toThrow("Database error: syntax error at position 10");
+            await expect(enqueued.promise).rejects.toThrow("syntax error at position 10");
             expect(queue.isEmpty()).toBe(true);
         });
 
@@ -132,13 +133,13 @@ describe("QueryQueue", () => {
                 return rows;
             })();
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             // Send one row successfully
             const row1: DataRow = { values: ["1"] };
             queue.processFrame(FRAME_URNS.dataRowUrn, row1);
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             // Then error occurs
             const errorFrame: ErrorFrame = {
@@ -146,7 +147,7 @@ describe("QueryQueue", () => {
             };
             queue.processFrame(FRAME_URNS.errorUrn, errorFrame);
 
-            await expect(iterationPromise).rejects.toThrow("Database error: connection lost");
+            await expect(iterationPromise).rejects.toThrow("connection lost");
         });
     });
 
@@ -276,26 +277,26 @@ describe("QueryQueue", () => {
             const consumePromise = (async () => {
                 const response = await enqueued.promise;
                 // Get first row manually
-                await new Promise((resolve) => setTimeout(resolve, 0));
+                await nextTick()
                 const first = await response.rows.next();
 
-                await new Promise((resolve) => setTimeout(resolve, 0));
+                await nextTick()
                 // Collect the rest
                 const rest = await response.rows.collect();
 
                 return { first: first.value, rest };
             })();
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: ["1"] });
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: ["2"] });
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: ["3"] });
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             queue.processFrame(FRAME_URNS.commandCompleteUrn, { complete: true });
 
@@ -350,10 +351,10 @@ describe("QueryQueue", () => {
                 return await response.rows.collect();
             })();
 
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: [null] });
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await nextTick()
 
             queue.processFrame(FRAME_URNS.commandCompleteUrn, { complete: true });
 
@@ -375,7 +376,7 @@ describe("QueryQueue", () => {
 
             queue.processFrame(FRAME_URNS.errorUrn, errorFrame);
 
-            await expect(enqueued.promise).rejects.toThrow("Database error: ");
+            await expect(enqueued.promise).rejects.toThrow("");
         });
     });
 });

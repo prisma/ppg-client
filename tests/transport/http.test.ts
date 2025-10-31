@@ -394,7 +394,7 @@ describe("HTTP Transport", () => {
 
             await expect(
                 transport.statement('query', 'SELECT invalid', [])
-            ).rejects.toThrow('Database error: Syntax error at or near "invalid"');
+            ).rejects.toThrow('Syntax error at or near "invalid"');
         });
     });
 

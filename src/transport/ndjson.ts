@@ -1,3 +1,4 @@
+import { DatabaseError } from "../api/client.ts";
 import { toCollectableIterator } from "../common/types.ts";
 import { isCommandComplete, isDataRow, isDataRowDescription, isErrorFrame } from "./frames.ts";
 import type { StatementResponse } from "./shared.ts";
@@ -53,10 +54,7 @@ export async function parseNDJSONResponse(response: Response): Promise<Statement
                         // CommandComplete - end of results
                         return;
                     } else if (isErrorFrame(frame)) {
-                        // TODO: ErrorFrame - Create proper error class
-                        // For now, throw a basic error with the error details
-                        const errorDetails = frame.error;
-                        throw new Error(`Database error: ${errorDetails.message}`);
+                        throw new DatabaseError(frame.error.message, frame.error.code, frame.error);
                     }
                 }
 
