@@ -116,11 +116,13 @@ export interface Client extends Queryable {
 export interface Session extends Queryable, AsyncDisposable {
     /**
      * Gracefully closes the current Session. Please notice
-     * this will not run any implicit transaction command.
+     * This will not run any implicit transaction command: the database
+     * will automatically rollback any pending transaction when
+     * closing without commit.
      *
      * This is an alias for [Symbol.asyncDispose]()
      */
-    close(): Promise<void>;
+    close(): PromiseLike<void>;
 
     /**
      * If true, the Session can still accept new queries. If false,

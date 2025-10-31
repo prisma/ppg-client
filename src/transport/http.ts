@@ -1,20 +1,14 @@
-import { type RawParameter } from "../common/types.ts";
-import {
-    type RequestFrame,
-    type StatementKind,
-    requestFrames,
-} from "./frames.ts";
+import type { RawParameter } from "../common/types.ts";
+import { type RequestFrame, type StatementKind, requestFrames } from "./frames.ts";
 import { createMultipartStream } from "./multipart.ts";
 import { parseNDJSONResponse } from "./ndjson.ts";
-import { FRAME_URNS, type HttpTransportConfig, MIME_TYPES, type StatementResponse } from "./shared.ts";
+import { type BaseTransport, FRAME_URNS, MIME_TYPES, type StatementResponse, type TransportConfig } from "./shared.ts";
 
 const HTTP_REQUEST_PATH = "/db/query_v2"; // TODO: change this
 
-export interface HttpTransport {
-    statement(kind: StatementKind, sql: string, parameters: RawParameter[]): Promise<StatementResponse>;
-}
+export interface HttpTransport extends BaseTransport {}
 
-export function httpTransport(config: HttpTransportConfig): HttpTransport {
+export function httpTransport(config: TransportConfig): HttpTransport {
     async function statement(kind: StatementKind, sql: string, parameters: RawParameter[]): Promise<StatementResponse> {
         // Build request frames using the requestFrames factory function
         const frames = await requestFrames(kind, sql, parameters);
@@ -39,10 +33,10 @@ export function httpTransport(config: HttpTransportConfig): HttpTransport {
 }
 
 interface QueryHttpRequest {
-    url: string
-    headers: Record<string, string>
-    frames: RequestFrame[]
-    keepalive: boolean
+    url: string;
+    headers: Record<string, string>;
+    frames: RequestFrame[];
+    keepalive: boolean;
 }
 
 async function request({ headers, keepalive, frames, url }: QueryHttpRequest): Promise<StatementResponse> {
@@ -59,9 +53,9 @@ async function request({ headers, keepalive, frames, url }: QueryHttpRequest): P
             "Content-Type": `${MIME_TYPES.multipartFormData}; profile="${FRAME_URNS.queryUrn}"; boundary=${boundary}`,
         },
         body: bodyStream,
-        duplex: 'half',
+        duplex: "half",
         keepalive, // node doesn't seem to support it, throws a TypeError when this is true
-    }
+    };
 
     // Make the HTTP request
     const response = await fetch(url, requestInit);
@@ -73,4 +67,3 @@ async function request({ headers, keepalive, frames, url }: QueryHttpRequest): P
     // Parse NDJSON response and create StatementResponse
     return parseNDJSONResponse(response);
 }
-

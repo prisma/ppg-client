@@ -1,6 +1,6 @@
-import { toCollectableIterator } from "../common/types";
-import { isDataRowDescription, isDataRow, isCommandComplete, isErrorFrame } from "./frames";
-import { StatementResponse } from "./shared";
+import { toCollectableIterator } from "../common/types.ts";
+import { isCommandComplete, isDataRow, isDataRowDescription, isErrorFrame } from "./frames.ts";
+import type { StatementResponse } from "./shared.ts";
 
 /**
  * Parses NDJSON response and creates a StatementResponse with collectable iterator for rows.

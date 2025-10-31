@@ -1,4 +1,5 @@
-import type { CollectableIterator } from "../common/types.ts";
+import type { CollectableIterator, RawParameter } from "../common/types.ts";
+import type { StatementKind } from "./frames.ts";
 
 export type FrameUrn = (typeof FRAME_URNS)[keyof typeof FRAME_URNS];
 export const FRAME_URNS = {
@@ -22,7 +23,7 @@ export const MIME_TYPES = {
     textPlain: "text/plain",
 } as const;
 
-export interface HttpTransportConfig {
+export interface TransportConfig {
     endpoint: string;
     username: string;
     password: string;
@@ -33,4 +34,8 @@ export interface HttpTransportConfig {
 export interface StatementResponse {
     readonly columns: { name: string; oid: number }[];
     readonly rows: CollectableIterator<(string | null)[]>;
+}
+
+export interface BaseTransport {
+    statement(kind: StatementKind, sql: string, parameters: RawParameter[]): Promise<StatementResponse>;
 }

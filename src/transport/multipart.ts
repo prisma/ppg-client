@@ -1,6 +1,6 @@
-import { isByteArrayParameter, isBoundedByteStreamParameter } from "../common/types";
-import { RequestFrame, isQueryDescriptorFrame, isExtendedParamFrame } from "./frames";
-import { FRAME_URNS, MIME_TYPES } from "./shared";
+import { isBoundedByteStreamParameter, isByteArrayParameter } from "../common/types.ts";
+import { type RequestFrame, isExtendedParamFrame, isQueryDescriptorFrame } from "./frames.ts";
+import { FRAME_URNS, MIME_TYPES } from "./shared.ts";
 
 /**
  * Creates a ReadableStream that generates multipart/form-data body from request frames.
@@ -33,9 +33,9 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                         `Content-Type: ${MIME_TYPES.textPlain}; charset=utf-8; profile="${FRAME_URNS.textParamUrn}"\r\n\r\n`,
                     );
 
-                    const param = extendedParam.data
+                    const param = extendedParam.data;
 
-                    if (typeof param === 'string') {
+                    if (typeof param === "string") {
                         // Plain string - encode and send
                         yield textEncoder.encode(param);
                         yield textEncoder.encode("\r\n");
@@ -58,7 +58,7 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                         yield textEncoder.encode("\r\n");
                     } else {
                         throw new Error(
-                            `Unsupported text extended parameter data type. Expected string, ByteArrayParameter, or BoundedByteStream, got: ${typeof param}`
+                            `Unsupported text extended parameter data type. Expected string, ByteArrayParameter, or BoundedByteStream, got: ${typeof param}`,
                         );
                     }
                 } else {
@@ -68,7 +68,7 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                         `Content-Type: ${MIME_TYPES.applicationOctetStream}; profile="${FRAME_URNS.binaryParamUrn}"\r\n\r\n`,
                     );
 
-                    if (typeof extendedParam.data === 'string') {
+                    if (typeof extendedParam.data === "string") {
                         // Plain string for binary - encode as UTF-8 bytes
                         yield textEncoder.encode(extendedParam.data);
                         yield textEncoder.encode("\r\n");
@@ -90,13 +90,13 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                         yield textEncoder.encode("\r\n");
                     } else {
                         throw new Error(
-                            `Unsupported binary extended parameter data type. Expected string, ByteArrayParameter, or BoundedByteStream, got: ${typeof extendedParam.data}`
+                            `Unsupported binary extended parameter data type. Expected string, ByteArrayParameter, or BoundedByteStream, got: ${typeof extendedParam.data}`,
                         );
                     }
                 }
             } else {
                 throw new Error(
-                    `Unsupported frame type. Expected QueryDescriptorFrame or ExtendedParamFrame, got: ${JSON.stringify(frame)}`
+                    `Unsupported frame type. Expected QueryDescriptorFrame or ExtendedParamFrame, got: ${JSON.stringify(frame)}`,
                 );
             }
         }

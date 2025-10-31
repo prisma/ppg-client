@@ -7,9 +7,9 @@ import {
     type ParameterFormat,
     type RawParameter,
     TEXT,
+    boundedByteStreamParameter,
     isBoundedByteStreamParameter,
     isByteArrayParameter,
-    boundedByteStreamParameter,
 } from "../common/types.ts";
 import { utf8ByteLength } from "./shims.ts";
 
@@ -28,13 +28,13 @@ export type QueryParameter = InlineQueryParameter | ExtendedQueryParameter;
 export type StatementKind = "query" | "exec";
 export type QueryDescriptorFrame =
     | {
-        query: string;
-        parameters?: QueryParameter[];
-    }
+          query: string;
+          parameters?: QueryParameter[];
+      }
     | {
-        exec: string;
-        parameters?: QueryParameter[];
-    };
+          exec: string;
+          parameters?: QueryParameter[];
+      };
 
 export type ExtendedParamFrame = {
     type: ParameterFormat;
@@ -75,30 +75,38 @@ export type ErrorFrame = {
 
 export type ResponseFrame = DataRowDescription | DataRow | CommandComplete | ErrorFrame;
 
-// Type guards for RequestFrame types
-export function isQueryDescriptorFrame(frame: RequestFrame): frame is QueryDescriptorFrame {
-    return ("query" in frame && typeof frame.query === "string") || ("exec" in frame && typeof frame.exec === "string");
+function isNonNull(x: unknown): x is object {
+    return !!x && typeof x === "object";
 }
 
-export function isExtendedParamFrame(frame: RequestFrame): frame is ExtendedParamFrame {
-    return "type" in frame && "data" in frame && (frame.type === "text" || frame.type === "binary");
+// Type guards for RequestFrame types
+export function isQueryDescriptorFrame(frame: unknown): frame is QueryDescriptorFrame {
+    return (
+        isNonNull(frame) &&
+        (("query" in frame && typeof frame.query === "string") || ("exec" in frame && typeof frame.exec === "string"))
+    );
+}
+
+export function isExtendedParamFrame(frame: unknown): frame is ExtendedParamFrame {
+    return isNonNull(frame) && "type" in frame && "data" in frame && (frame.type === "text" || frame.type === "binary");
 }
 
 // Type guards for ResponseFrame types
-export function isDataRowDescription(frame: ResponseFrame): frame is DataRowDescription {
-    return "columns" in frame && Array.isArray(frame.columns);
+export function isDataRowDescription(frame: unknown): frame is DataRowDescription {
+    return isNonNull(frame) && "columns" in frame && Array.isArray(frame.columns);
 }
 
-export function isDataRow(frame: ResponseFrame): frame is DataRow {
-    return "values" in frame && Array.isArray(frame.values);
+export function isDataRow(frame: unknown): frame is DataRow {
+    return isNonNull(frame) && "values" in frame && Array.isArray(frame.values);
 }
 
-export function isCommandComplete(frame: ResponseFrame): frame is CommandComplete {
-    return "complete" in frame && frame.complete === true;
+export function isCommandComplete(frame: unknown): frame is CommandComplete {
+    return isNonNull(frame) && "complete" in frame && frame.complete === true;
 }
 
-export function isErrorFrame(frame: ResponseFrame): frame is ErrorFrame {
+export function isErrorFrame(frame: unknown): frame is ErrorFrame {
     return (
+        isNonNull(frame) &&
         "error" in frame &&
         typeof frame.error === "object" &&
         frame.error !== null &&
@@ -147,7 +155,7 @@ export async function requestFrames(
     for (const param of rawParams) {
         if (typeof param === "string") {
             // Handle string parameters - assume TEXT format
-            const byteLength = utf8ByteLength(param)
+            const byteLength = utf8ByteLength(param);
             if (byteLength <= EXENDED_PARAM_SIZE_THRESHOLD) {
                 // Inline string parameter
                 queryParams.push({
@@ -165,7 +173,7 @@ export async function requestFrames(
                     start(controller) {
                         controller.enqueue(param);
                         controller.close();
-                    }
+                    },
                 });
                 const encoderStream = new TextEncoderStream();
                 const encodedStream = stringStream.pipeThrough(encoderStream);
