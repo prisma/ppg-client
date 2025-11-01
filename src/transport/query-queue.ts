@@ -1,7 +1,6 @@
 import { DatabaseError } from "../api/client.ts";
-import { type CollectableIterator, toCollectableIterator } from "../common/types.ts";
+import { toCollectableIterator } from "../common/types.ts";
 import {
-    ColumnMetadata,
     type DataRow,
     type DataRowDescription,
     type ErrorFrame,

@@ -13,16 +13,7 @@ vi.mock("../../src/transport/shims.ts", async (importOriginal) => {
     return {
         ...actual,
         createWebSocket: mockWsSetup.mockFactory,
-        createDeferred: () => {
-            const deferred: any = {};
-            deferred.promise = new Promise((resolve, reject) => {
-                deferred.resolve = resolve;
-                deferred.reject = reject;
-            });
-            return deferred;
-        },
         // Use real wsBusyCheck so it checks bufferedAmount
-        // wsBusyCheck: actual.wsBusyCheck (this is the default from ...actual)
     };
 });
 
@@ -39,7 +30,7 @@ describe("wsTransportConnection", () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         mockWsSetup.reset();
-        global.WebSocket = MockWebSocket as any;
+        global.WebSocket = MockWebSocket;
 
         // Dynamic import to get mocked version
         const module = await import("../../src/transport/websocket-conn.ts");
@@ -96,7 +87,10 @@ describe("wsTransportConnection", () => {
             await nextTick()
 
             expect(getMockWs().sentMessages.length).toBe(1);
-            const authFrame = JSON.parse(getMockWs().sentMessages[0]);
+            const msg = getMockWs().sentMessages[0];
+            expect(msg).to.be.a('string')
+
+            const authFrame = JSON.parse(msg as string);
             expect(authFrame).toEqual({
                 username: "testuser",
                 password: "testpass",

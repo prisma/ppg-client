@@ -551,7 +551,7 @@ describe("HTTP Transport", () => {
                     statusText: 'Not Found'
                 });
             });
-            global.fetch = mockFetch as any;
+            global.fetch = mockFetch as typeof global.fetch;
 
             const transport = httpTransport({
                 endpoint: 'http://localhost:3000',
@@ -572,7 +572,7 @@ describe("HTTP Transport", () => {
                     statusText: 'Internal Server Error'
                 });
             });
-            global.fetch = mockFetch as any;
+            global.fetch = mockFetch as typeof global.fetch;
 
             const transport = httpTransport({
                 endpoint: 'http://localhost:3000',
@@ -595,7 +595,7 @@ describe("HTTP Transport", () => {
                     },
                 });
             });
-            global.fetch = mockFetch as any;
+            global.fetch = mockFetch as typeof global.fetch;
 
             const transport = httpTransport({
                 endpoint: 'http://localhost:3000',

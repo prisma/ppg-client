@@ -24,7 +24,8 @@
         "rules": {
             "recommended": true,
             "correctness": {
-                "useImportExtensions": "error"
+                "useImportExtensions": "error",
+                "noUnusedImports": "error"
             },
             "style": {
                 "noNonNullAssertion": "off",

@@ -181,7 +181,7 @@ describe("CollectableIterator", () => {
                 async next() {
                     return { value: 1, done: false };
                 },
-                async return(value?: any) {
+                async return(value) {
                     returnCalled = true;
                     return { value, done: true };
                 },
@@ -274,7 +274,7 @@ describe("CollectableIterator", () => {
                 async next() {
                     return { value: 1, done: false };
                 },
-                async throw(error?: any) {
+                async throw(error) {
                     throwCalled = true;
                     errorMessage = error.message;
                     return Promise.reject(error);

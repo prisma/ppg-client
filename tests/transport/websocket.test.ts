@@ -13,14 +13,6 @@ vi.mock("../../src/transport/shims.ts", async (importOriginal) => {
     return {
         ...actual,
         createWebSocket: mockWsSetup.mockFactory,
-        createDeferred: () => {
-            const deferred: any = {};
-            deferred.promise = new Promise((resolve, reject) => {
-                deferred.resolve = resolve;
-                deferred.reject = reject;
-            });
-            return deferred;
-        },
     };
 });
 
@@ -86,7 +78,9 @@ describe("WebSocketTransport", () => {
             const sentMessages = getMockWs().sentMessages;
             expect(sentMessages.length).toBeGreaterThan(0);
 
-            const authFrame = JSON.parse(sentMessages[0]);
+            expect(sentMessages[0]).to.be.a('string')
+
+            const authFrame = JSON.parse(sentMessages[0] as string);
             expect(authFrame).toEqual({
                 username: "testuser",
                 password: "testpass",
@@ -109,7 +103,10 @@ describe("WebSocketTransport", () => {
 
             // Find the query descriptor frame
             const queryDescriptorIndex = sentMessages.indexOf(FRAME_URNS.queryDescriptorUrn);
-            const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1]);
+
+            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a('string')
+
+            const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1] as string);
             expect(queryDescriptor).toMatchObject({
                 query: "SELECT id, name FROM users",
             });
@@ -150,7 +147,10 @@ describe("WebSocketTransport", () => {
             // Verify query frame with parameters
             const sentMessages = getMockWs().sentMessages;
             const queryDescriptorIndex = sentMessages.indexOf(FRAME_URNS.queryDescriptorUrn);
-            const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1]);
+
+            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a('string')
+
+            const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1] as string);
 
             expect(queryDescriptor.query).toBe("SELECT * FROM users WHERE id = $1");
             expect(queryDescriptor.parameters).toHaveLength(1);
@@ -172,7 +172,10 @@ describe("WebSocketTransport", () => {
 
             const sentMessages = getMockWs().sentMessages;
             const queryDescriptorIndex = sentMessages.indexOf(FRAME_URNS.queryDescriptorUrn);
-            const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1]);
+
+            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a('string')
+
+            const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1] as string);
 
             expect(queryDescriptor.exec).toBe("INSERT INTO users (name) VALUES ($1)");
 
@@ -242,9 +245,13 @@ describe("WebSocketTransport", () => {
             expect(urnIndices.length).toBe(3);
 
             // Verify each query's frames are contiguous (URN followed immediately by payload)
-            const query1Data = JSON.parse(sentMessages[urnIndices[0] + 1]);
-            const query2Data = JSON.parse(sentMessages[urnIndices[1] + 1]);
-            const query3Data = JSON.parse(sentMessages[urnIndices[2] + 1]);
+            expect(sentMessages[urnIndices[0] + 1]).to.be.a('string')
+            expect(sentMessages[urnIndices[1] + 1]).to.be.a('string')
+            expect(sentMessages[urnIndices[2] + 1]).to.be.a('string')
+
+            const query1Data = JSON.parse(sentMessages[urnIndices[0] + 1] as string);
+            const query2Data = JSON.parse(sentMessages[urnIndices[1] + 1] as string);
+            const query3Data = JSON.parse(sentMessages[urnIndices[2] + 1] as string);
 
             expect(query1Data.query).toBe("SELECT 'query1'");
             expect(query2Data.query).toBe("SELECT 'query2'");

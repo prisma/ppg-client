@@ -23,17 +23,17 @@ export type ExtendedQueryParameter = {
     byteSize: number;
 };
 
-export type QueryParameter = InlineQueryParameter | ExtendedQueryParameter;
+type Parameter = InlineQueryParameter | ExtendedQueryParameter;
 
 export type StatementKind = "query" | "exec";
 export type QueryDescriptorFrame =
     | {
           query: string;
-          parameters?: QueryParameter[];
+          parameters?: Parameter[];
       }
     | {
           exec: string;
-          parameters?: QueryParameter[];
+          parameters?: Parameter[];
       };
 
 export type ExtendedParamFrame = {
@@ -148,7 +148,7 @@ export async function requestFrames(
     sql: string,
     rawParams: RawParameter[],
 ): Promise<RequestFrame[]> {
-    const queryParams: QueryParameter[] = [];
+    const queryParams: Parameter[] = [];
     const extendedFrames: ExtendedParamFrame[] = [];
 
     // Process each parameter

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { requestFrames, QueryDescriptorFrame, ExtendedParamFrame } from "../../src/transport/frames";
+import { requestFrames, QueryDescriptorFrame, ExtendedParamFrame, InlineQueryParameter } from "../../src/transport/frames";
 import { boundedByteStreamParameter, byteArrayParameter, BINARY, TEXT } from "../../src/common/types";
 
 describe("queryRequest", () => {
@@ -110,7 +110,7 @@ describe("queryRequest", () => {
             expect(descriptor.parameters![0]).toHaveProperty("value");
 
             // Verify we can decode it back
-            const base64 = (descriptor.parameters![0] as any).value;
+            const base64 = (descriptor.parameters![0] as InlineQueryParameter).value;
             expect(typeof base64).toBe("string");
         });
 

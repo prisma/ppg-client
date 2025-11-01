@@ -1,66 +1,84 @@
+
+const arrayBufferType: BinaryType = "arraybuffer"
+
 /**
  * Mock WebSocket implementation for testing
  */
-export class MockWebSocket {
-    static CONNECTING = 0;
-    static OPEN = 1;
-    static CLOSING = 2;
-    static CLOSED = 3;
+export class MockWebSocket implements WebSocket {
+    static CONNECTING = 0 as const;
+    static OPEN = 1 as const;
+    static CLOSING = 2 as const;
+    static CLOSED = 3 as const;
+
+    extensions = "";
+    CONNECTING = MockWebSocket.CONNECTING;
+    OPEN = MockWebSocket.OPEN;
+    CLOSING = MockWebSocket.CLOSING;
+    CLOSED = MockWebSocket.CLOSED;
 
     readyState: number = MockWebSocket.CONNECTING;
-    binaryType: string = "blob";
+    binaryType = arrayBufferType;
     url: string;
     protocol: string;
 
-    onopen: ((event: any) => void) | null = null;
-    onmessage: ((event: any) => void) | null = null;
-    onerror: ((event: any) => void) | null = null;
-    onclose: ((event: any) => void) | null = null;
+    onclose: ((ev: WebSocketEventMap['close']) => void) | null = null
+    onerror: ((ev: WebSocketEventMap['error']) => void) | null = null
+    onmessage: ((ev: WebSocketEventMap['message']) => void) | null = null
+    onopen: ((ev: WebSocketEventMap['open']) => void) | null = null
 
-    sentMessages: any[] = [];
+    sentMessages: unknown[] = [];
     bufferedAmount: number = 0;
 
-    constructor(url: string, protocol: string) {
-        this.url = url;
-        this.protocol = protocol;
+    constructor(url: string | URL, protocols?: string | string[]) {
+        this.url = url.toString();
+        this.protocol = typeof protocols === 'string' ? protocols : protocols ? protocols[0] : "";
 
         // Simulate async connection
         setTimeout(() => {
             this.readyState = MockWebSocket.OPEN;
             if (this.onopen) {
-                this.onopen({ type: "open" });
+                this.onopen({ type: "open" } as Event);
             }
         }, 0);
     }
+    addEventListener(type: unknown, listener: unknown, options?: unknown): void {
+        throw new Error("Method not implemented.");
+    }
+    removeEventListener(type: unknown, listener: unknown, options?: unknown): void {
+        throw new Error("Method not implemented.");
+    }
+    dispatchEvent(event: Event): boolean {
+        throw new Error("Method not implemented.");
+    }
 
-    send(data: any) {
+    send(data: unknown) {
         this.sentMessages.push(data);
     }
 
     close(code?: number, reason?: string) {
         this.readyState = MockWebSocket.CLOSED;
         if (this.onclose) {
-            this.onclose({ type: "close", code: code ?? 1000, reason: reason ?? "" });
+            this.onclose({ type: "close", code: code ?? 1000, reason: reason ?? "" } as CloseEvent);
         }
     }
 
     // Test helper methods
-    simulateMessage(data: any) {
+    simulateMessage(data: unknown) {
         if (this.onmessage) {
-            this.onmessage({ type: "message", data });
+            this.onmessage({ type: "message", data } as MessageEvent);
         }
     }
 
     simulateError(message: string) {
         if (this.onerror) {
-            this.onerror({ type: "error", message });
+            this.onerror({ type: "error", message } as ErrorEvent);
         }
     }
 
     simulateClose(code: number, reason: string) {
         this.readyState = MockWebSocket.CLOSED;
         if (this.onclose) {
-            this.onclose({ type: "close", code, reason });
+            this.onclose({ type: "close", code, reason } as CloseEvent);
         }
     }
 }
