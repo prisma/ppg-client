@@ -1,10 +1,10 @@
 import type { WebSocketAuthFrame } from "./frames.ts";
-import { type QueryQueue, newQueryQueue } from "./query-queue.ts";
+import { type EnqueuedQuery, newQueryQueue } from "./query-queue.ts";
 import type { TransportConfig } from "./shared.ts";
 import { createDeferred, createWebSocket, wsBusyCheck } from "./shims.ts";
 
 export interface WsTransportConnection {
-    readonly queryQueue: QueryQueue;
+    enqueueNewQuery(): EnqueuedQuery;
     send(data: string | ArrayBufferLike | Blob | ArrayBufferView<ArrayBufferLike>): Promise<void>;
     isReady(): boolean;
     close(): void;
@@ -12,7 +12,6 @@ export interface WsTransportConnection {
 
 const WS_REQUEST_PATH = "/db/websocket";
 const WS_SUBPROTOCOL = "prisma-postgres-1.0";
-const AUTH_TIMEOUT_MS = 5000;
 const MAX_BACKOFF_MS = 100;
 
 export async function wsTransportConnection(config: TransportConfig): Promise<WsTransportConnection> {
@@ -102,7 +101,9 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
         isReady() {
             return ws.readyState === WebSocket.OPEN;
         },
-        queryQueue,
+        enqueueNewQuery() {
+            return queryQueue.enqueueNew();
+        },
         async send(data) {
             let backoffMs = 5;
             while (isBusy()) {

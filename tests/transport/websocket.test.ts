@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { MockWebSocket, createMockWebSocketSetup, nextTick } from "./websocket-test-utils.ts";
 import type { TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
-import type { DataRowDescription, DataRow, CommandComplete } from "../../src/transport/frames.ts";
+import type { WebSocketTransport } from "../../src/transport/websocket.ts";
 
 // Setup mock WebSocket
 const mockWsSetup = createMockWebSocketSetup();
@@ -31,7 +31,7 @@ describe("WebSocketTransport", () => {
         password: "testpass",
     };
 
-    let webSocketTransport: any;
+    let webSocketTransport: (config: TransportConfig) => Promise<WebSocketTransport>;
 
     beforeEach(async () => {
         vi.clearAllMocks();
@@ -562,7 +562,7 @@ describe("WebSocketTransport", () => {
 
             const closeSpy = vi.spyOn(getMockWs(), "close");
 
-            await transport[Symbol.asyncDispose]();
+            transport[Symbol.dispose]();
 
             expect(closeSpy).toHaveBeenCalledWith(1000, "Normal closure");
         });
@@ -576,7 +576,7 @@ describe("WebSocketTransport", () => {
 
                 // In real code: await using transport = await webSocketTransport(config);
                 // Manually call dispose for testing
-                await transport[Symbol.asyncDispose]();
+                transport[Symbol.dispose]();
             }
 
             expect(closeSpy).toHaveBeenCalled();

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
 import { MockWebSocket, createMockWebSocketSetup, nextTick } from "./websocket-test-utils.ts";
+import type { WsTransportConnection } from "../../src/transport/websocket-conn.ts";
 
 // Setup mock WebSocket
 const mockWsSetup = createMockWebSocketSetup();
@@ -33,7 +34,7 @@ describe("wsTransportConnection", () => {
     };
 
     // Import after mocking
-    let wsTransportConnection: any;
+    let wsTransportConnection: (config: TransportConfig) => Promise<WsTransportConnection>;
 
     beforeEach(async () => {
         vi.clearAllMocks();
@@ -113,7 +114,6 @@ describe("wsTransportConnection", () => {
             const conn = await connPromise;
             expect(conn).toBeDefined();
             expect(conn.isReady()).toBe(true);
-            expect(conn.queryQueue).toBeDefined();
         });
 
     });
@@ -126,7 +126,7 @@ describe("wsTransportConnection", () => {
             const conn = await connPromise;
 
             // Enqueue a query
-            const query = conn.queryQueue.enqueueNew();
+            const query = conn.enqueueNewQuery();
 
             // Send DataRowDescription (URN + payload)
             getMockWs().simulateMessage(FRAME_URNS.dataRowDescriptionUrn);
@@ -148,7 +148,7 @@ describe("wsTransportConnection", () => {
 
             const conn = await connPromise;
 
-            const query = conn.queryQueue.enqueueNew();
+            const query = conn.enqueueNewQuery();
 
             // Send row description
             getMockWs().simulateMessage(FRAME_URNS.dataRowDescriptionUrn);
@@ -189,8 +189,8 @@ describe("wsTransportConnection", () => {
 
             const conn = await connPromise;
 
-            const query1 = conn.queryQueue.enqueueNew();
-            const query2 = conn.queryQueue.enqueueNew();
+            const query1 = conn.enqueueNewQuery();
+            const query2 = conn.enqueueNewQuery();
 
             const closeSpy = vi.spyOn(getMockWs(), "close");
 
@@ -216,8 +216,8 @@ describe("wsTransportConnection", () => {
 
             const conn = await connPromise;
 
-            const query1 = conn.queryQueue.enqueueNew();
-            const query2 = conn.queryQueue.enqueueNew();
+            const query1 = conn.enqueueNewQuery();
+            const query2 = conn.enqueueNewQuery();
 
             getMockWs().simulateError("Connection lost");
 
@@ -231,7 +231,7 @@ describe("wsTransportConnection", () => {
 
             const conn = await connPromise;
 
-            const query = conn.queryQueue.enqueueNew();
+            const query = conn.enqueueNewQuery();
 
             // Simulate error event without message property
             const onerror = getMockWs().onerror;
@@ -248,7 +248,7 @@ describe("wsTransportConnection", () => {
 
             const conn = await connPromise;
 
-            const query = conn.queryQueue.enqueueNew();
+            const query = conn.enqueueNewQuery();
 
             getMockWs().simulateMessage(FRAME_URNS.errorUrn);
             getMockWs().simulateMessage(JSON.stringify({
@@ -266,8 +266,8 @@ describe("wsTransportConnection", () => {
 
             const conn = await connPromise;
 
-            const query1 = conn.queryQueue.enqueueNew();
-            const query2 = conn.queryQueue.enqueueNew();
+            const query1 = conn.enqueueNewQuery();
+            const query2 = conn.enqueueNewQuery();
 
             getMockWs().simulateClose(1006, "Abnormal closure");
 

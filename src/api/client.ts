@@ -41,7 +41,7 @@ export interface ClientConfig extends BaseConfig {
  * Configuration for a database Session.
  * Allows per-session customization of parsing and serialization behavior.
  */
-export interface SessionConfig extends BaseConfig { }
+export interface SessionConfig extends BaseConfig {}
 
 /**
  * A mixin interface allowing single query execution.
@@ -259,7 +259,6 @@ export interface ValueSerializer<T> {
     serialize(value: T): QueryParameter;
 }
 
-
 export class DatabaseError extends Error {
     readonly code: string;
     readonly details: Record<string, string>;
@@ -267,7 +266,9 @@ export class DatabaseError extends Error {
         super(message);
         this.code = code;
         this.details = details;
+        // biome-ignore lint:
         delete details.code;
+        // biome-ignore lint:
         delete details.message;
         this.name = new.target.name;
     }

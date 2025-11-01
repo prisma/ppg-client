@@ -15,10 +15,10 @@ import { type Deferred, createDeferred, emptyIterableIterator } from "./shims.ts
 
 type RowIteratorResult = IteratorResult<(string | null)[]>;
 
-export type EnqueuedQuery = {
+export interface EnqueuedQuery {
     readonly promise: Promise<StatementResponse>;
     abort(error: Error): void;
-};
+}
 
 export interface QueryQueue {
     isEmpty(): boolean;

@@ -3,16 +3,15 @@ import { type RequestFrame, type StatementKind, requestFrames } from "./frames.t
 import { type BaseTransport, FRAME_URNS, type StatementResponse, type TransportConfig } from "./shared.ts";
 import { wsTransportConnection } from "./websocket-conn.ts";
 
-export interface WebSocketTransport extends BaseTransport, AsyncDisposable {
+export interface WebSocketTransport extends BaseTransport, Disposable {
     /**
      * Gracefully closes the current WebSocketTransport.
      * This will not run any implicit transaction command: the database
-     * will automatically rollback any pending transaction when
-     * closing without commit.
+     * will rollback any pending transaction when closing without commit.
      *
-     * This is an alias for [Symbol.asyncDispose]()
+     * This is an alias for [Symbol.dispose]()
      */
-    close(): PromiseLike<void>;
+    close(): void;
 
     /**
      * Check if the connection is open
@@ -34,27 +33,26 @@ export async function webSocketTransport(config: TransportConfig): Promise<WebSo
                 await conn.send(JSON.stringify(frame));
             } else {
                 // ExtendedParamFrame
-                const extendedParam = frame;
-                const isTextParam = extendedParam.type === "text";
+                const isTextParam = frame.type === "text";
 
                 await conn.send(isTextParam ? FRAME_URNS.textParamUrn : FRAME_URNS.binaryParamUrn);
 
-                if (typeof extendedParam.data === "string") {
-                    await conn.send(extendedParam.data);
-                } else if (extendedParam.data instanceof Uint8Array) {
-                    await conn.send(extendedParam.data);
-                } else if (extendedParam.data instanceof ReadableStream) {
+                if (typeof frame.data === "string") {
+                    await conn.send(frame.data);
+                } else if (frame.data instanceof Uint8Array) {
+                    await conn.send(frame.data);
+                } else if (frame.data instanceof ReadableStream) {
                     if (isTextParam) {
                         // Consume the stream and decode to string
-                        const text = await consumeStreamToString(extendedParam.data);
+                        const text = await consumeStreamToString(frame.data);
                         await conn.send(text);
                     } else {
                         // Consume the stream into a Uint8Array
-                        const bytes = await consumeStreamToUint8Array(extendedParam.data);
+                        const bytes = await consumeStreamToUint8Array(frame.data);
                         await conn.send(bytes);
                     }
                 } else {
-                    throw new Error(`Unsupported extended parameter data type: ${typeof extendedParam.data}`);
+                    throw new Error(`Unsupported extended parameter data type: ${typeof frame.data}`);
                 }
             }
         }
@@ -67,20 +65,25 @@ export async function webSocketTransport(config: TransportConfig): Promise<WebSo
                 throw new Error("WebSocket is not connected");
             }
 
+            // Prepare the request frames
             const frames = await requestFrames(kind, sql, parameters);
 
-            // Enqueue query and get promise for the complete response
-            const enqueuedQuery = conn.queryQueue.enqueueNew();
+            // Enqueue query and get promise for the complete response.
+            // Results arrive in a FIFO order, so this enqueued query will
+            // match the rquest frames we're about to send.
+            const enqueuedQuery = conn.enqueueNewQuery();
 
-            // Chain this send operation to the queue to ensure sequential execution
-            // and wait for it to complete (blocks on backpressure)
+            // Chain this send operation to the queue to ensure sequential execution...
             sendQueue = sendQueue.then(() => sendFrames(frames)).catch(enqueuedQuery.abort);
+
+            // ...and wait for it to complete (so it blocks on backpressure)
             await sendQueue;
 
+            // This promise resolves when results from the related enqueued query start arriving
             return enqueuedQuery.promise;
         },
 
-        async close() {
+        close() {
             conn.close();
         },
 
@@ -88,8 +91,8 @@ export async function webSocketTransport(config: TransportConfig): Promise<WebSo
             return conn.isReady();
         },
 
-        async [Symbol.asyncDispose]() {
-            await this.close();
+        [Symbol.dispose]() {
+            this.close();
         },
     };
 
