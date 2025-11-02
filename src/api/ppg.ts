@@ -1,13 +1,15 @@
 import type { CollectableIterator } from "../common/types.ts";
 import type { ClientConfig } from "./client.ts";
 
-export declare function ppg(config: ClientConfig): Ppg;
+export interface PrismaPostgresConfig extends ClientConfig {}
+
+export declare function prismaPostgres(config: PrismaPostgresConfig): PrismaPostgres;
 
 /**
  * SQL template literal tag interface for query execution.
  * Provides a convenient template syntax for building parameterized queries.
  */
-export interface Sql {
+export interface SqlTemplateStatements {
     /**
      * Executes a SQL query using template literal syntax and returns a stream of typed rows.
      *
@@ -17,7 +19,7 @@ export interface Sql {
      *
      * ```ts
      * const userId = 42;
-     * const rows = sql<User>`SELECT * FROM users WHERE id = ${userId}`;
+     * const rows = ppg.sql<User>`SELECT * FROM users WHERE id = ${userId}`;
      *
      * // Option 1: Stream rows one by one
      * for await (const user of rows) {
@@ -39,14 +41,14 @@ export interface Sql {
      *
      * ```ts
      * const userId = 42;
-     * const affected = await sql.exec`DELETE FROM users WHERE id = ${userId}`;
+     * const affected = await ppg.sql.exec`DELETE FROM users WHERE id = ${userId}`;
      * console.log(`Deleted ${affected} user(s)`);
      * ```
      */
     exec(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>;
 }
 
-export interface PpgQueryable {
+export interface PrismaPostgresStatements {
     /**
      * SQL template literal tag for executing queries with type-safe results.
      *
@@ -63,7 +65,7 @@ export interface PpgQueryable {
      * const allUsers = await rows.collect();
      * ```
      */
-    sql: Sql;
+    sql: SqlTemplateStatements;
 
     /**
      * Executes a raw SQL query with parameterized placeholders and returns a stream of typed rows.
@@ -101,10 +103,7 @@ export interface PpgQueryable {
     exec(sql: string, ...params: unknown[]): Promise<number>;
 }
 
-/**
- * High-level Prisma Postgres client interface with convenient query methods.
- */
-export interface Ppg extends PpgQueryable {
+export interface PrismaPostgresTransactions {
     /**
      * Executes an interactive transaction, providing the `Sql` interface in the
      * given callback to run interactive queries/commands. The transaction BEGIN
@@ -123,7 +122,7 @@ export interface Ppg extends PpgQueryable {
      *   // ROLLBACK is performed automatically when throwing errors
      * })
      */
-    transaction<T = void>(callback: (q: PpgQueryable) => Promise<T>): Promise<T>;
+    transaction<T = void>(callback: (statements: PrismaPostgresStatements) => Promise<T>): Promise<T>;
 
     /**
      * Executes a batch transaction with a fixed set of queries or commands. The transaction BEGIN
@@ -168,6 +167,11 @@ export interface Ppg extends PpgQueryable {
      */
     batch(): BatchQueryBuilder<[]>;
 }
+
+/**
+ * High-level Prisma Postgres client interface with convenient query methods.
+ */
+export interface PrismaPostgres extends PrismaPostgresStatements, PrismaPostgresTransactions {}
 
 /**
  * Type representing a tuple of batch result types.

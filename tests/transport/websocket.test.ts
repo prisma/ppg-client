@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RequestFrame } from "../../src/transport/frames.ts";
-import type { TransportConfig } from "../../src/transport/shared.ts";
+import type { Column, TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
 import type { WebSocketTransport } from "../../src/transport/websocket.ts";
 import { MockWebSocket, createMockWebSocketSetup, runEventLoop } from "./websocket-test-utils.ts";
@@ -49,7 +49,7 @@ describe("WebSocketTransport", () => {
     }
 
     // Helper to simulate a complete query response
-    function simulateQueryResponse(columns: { name: string; typeOid: number }[], rows: (string | null)[][]) {
+    function simulateQueryResponse(columns: Column[], rows: (string | null)[][]) {
         // Send DataRowDescription
         getMockWs().simulateMessage(FRAME_URNS.dataRowDescriptionUrn);
         getMockWs().simulateMessage(JSON.stringify({ columns }));
@@ -115,8 +115,8 @@ describe("WebSocketTransport", () => {
             // Simulate server response
             simulateQueryResponse(
                 [
-                    { name: "id", typeOid: 23 },
-                    { name: "name", typeOid: 25 },
+                    { name: "id", oid: 23 },
+                    { name: "name", oid: 25 },
                 ],
                 [
                     ["1", "Alice"],
@@ -157,7 +157,7 @@ describe("WebSocketTransport", () => {
             expect(queryDescriptor.parameters).toHaveLength(1);
             expect(queryDescriptor.parameters[0]).toMatchObject({ type: expect.any(String), value: "42" });
 
-            simulateQueryResponse([{ name: "id", typeOid: 23 }], [["42"]]);
+            simulateQueryResponse([{ name: "id", oid: 23 }], [["42"]]);
 
             const response = await queryPromise;
             const rows = await response.rows.collect();
@@ -195,7 +195,7 @@ describe("WebSocketTransport", () => {
 
             await runEventLoop();
 
-            simulateQueryResponse([{ name: "id", typeOid: 23 }], []);
+            simulateQueryResponse([{ name: "id", oid: 23 }], []);
 
             const response = await queryPromise;
             const rows = await response.rows.collect();
@@ -208,7 +208,7 @@ describe("WebSocketTransport", () => {
             // First query
             const query1Promise = transport.statement("query", "SELECT 1", []);
             await runEventLoop();
-            simulateQueryResponse([{ name: "?column?", typeOid: 23 }], [["1"]]);
+            simulateQueryResponse([{ name: "?column?", oid: 23 }], [["1"]]);
             const response1 = await query1Promise;
             const rows1 = await response1.rows.collect();
             expect(rows1).toEqual([["1"]]);
@@ -216,7 +216,7 @@ describe("WebSocketTransport", () => {
             // Second query
             const query2Promise = transport.statement("query", "SELECT 2", []);
             await runEventLoop();
-            simulateQueryResponse([{ name: "?column?", typeOid: 23 }], [["2"]]);
+            simulateQueryResponse([{ name: "?column?", oid: 23 }], [["2"]]);
             const response2 = await query2Promise;
             const rows2 = await response2.rows.collect();
             expect(rows2).toEqual([["2"]]);
@@ -259,9 +259,9 @@ describe("WebSocketTransport", () => {
             expect(query3Data.query).toBe("SELECT 'query3'");
 
             // Respond to all queries
-            simulateQueryResponse([{ name: "?column?", typeOid: 25 }], [["query1"]]);
-            simulateQueryResponse([{ name: "?column?", typeOid: 25 }], [["query2"]]);
-            simulateQueryResponse([{ name: "?column?", typeOid: 25 }], [["query3"]]);
+            simulateQueryResponse([{ name: "?column?", oid: 25 }], [["query1"]]);
+            simulateQueryResponse([{ name: "?column?", oid: 25 }], [["query2"]]);
+            simulateQueryResponse([{ name: "?column?", oid: 25 }], [["query3"]]);
 
             const [response1, response2, response3] = await Promise.all([query1Promise, query2Promise, query3Promise]);
 

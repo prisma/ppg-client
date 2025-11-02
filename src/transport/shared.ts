@@ -32,10 +32,35 @@ export interface TransportConfig {
 }
 
 export interface StatementResponse {
-    readonly columns: { name: string; oid: number }[];
+    readonly columns: Column[];
     readonly rows: CollectableIterator<(string | null)[]>;
 }
 
 export interface BaseTransport {
     statement(kind: StatementKind, sql: string, parameters: RawParameter[]): Promise<StatementResponse>;
+}
+
+/**
+ * Resultset column descriptor.
+ */
+export interface Column {
+    /**
+     * Name of the column.
+     */
+    name: string;
+
+    /**
+     * Object identifier of the column type.
+     *
+     * If you need to know the column type name, you can use the `oid` to query
+     * the `pg_type` catalog:
+     *
+     * ```ts
+     * await client.run({
+     *   sql: `SELECT typname FROM pg_type WHERE oid = $1`,
+     *   parameters: [column.oid],
+     * });
+     * ```
+     */
+    oid: number;
 }

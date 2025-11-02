@@ -1,7 +1,7 @@
 import { DatabaseError } from "../api/client.ts";
 import { toCollectableIterator } from "../common/types.ts";
 import { isCommandComplete, isDataRow, isDataRowDescription, isErrorFrame } from "./frames.ts";
-import type { StatementResponse } from "./shared.ts";
+import type { Column, StatementResponse } from "./shared.ts";
 
 /**
  * Parses NDJSON response and creates a StatementResponse with collectable iterator for rows.
@@ -16,7 +16,7 @@ export async function parseNDJSONResponse(response: Response): Promise<Statement
     let buffer = "";
 
     // Store column metadata from DataRowDescription frame
-    let columns: { name: string; oid: number }[] = [];
+    let columns: Column[] = [];
 
     // Create async generator for rows
     async function* rowGenerator(): AsyncIterableIterator<(string | null)[]> {
@@ -46,7 +46,7 @@ export async function parseNDJSONResponse(response: Response): Promise<Statement
 
                     if (isDataRowDescription(frame)) {
                         // DataRowDescription - save columns for later
-                        columns = frame.columns.map((col) => ({ name: col.name, oid: col.typeOid }));
+                        columns = frame.columns.map((col) => ({ name: col.name, oid: col.oid }));
                     } else if (isDataRow(frame)) {
                         // DataRow
                         yield frame.values;

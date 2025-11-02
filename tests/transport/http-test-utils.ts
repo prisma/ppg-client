@@ -4,6 +4,7 @@ import { expect, vi } from "vitest";
 import { BINARY, byteArrayParameter } from "../../src/common/types.ts";
 import type { ExtendedParamFrame, QueryDescriptorFrame, ResponseFrame } from "../../src/transport/frames.ts";
 import { utf8ByteLength } from "../../src/transport/shims.ts";
+import { Column } from "../../src/transport/shared.ts";
 
 /**
  * Mock HTTP Server for testing the HTTP transport.
@@ -335,7 +336,7 @@ export class MockHttpServer {
     /**
      * Configure response: send column descriptor
      */
-    respondWithColumns(columns: { name: string; typeOid: number }[]): this {
+    respondWithColumns(columns: Column[]): this {
         this.responseFrames.push({
             columns,
         });

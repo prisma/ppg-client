@@ -61,8 +61,10 @@ export interface CollectableIterator<T> extends AsyncIterableIterator<T> {
 
 /**
  * Wraps an AsyncIterableIterator to add the collect() method, making it a CollectableIterator.
+ * Optionally transforms each item using the provided transform function.
  *
  * @param iterator - The source async iterable iterator
+ * @param transform - Optional transformation function to apply to each item
  * @returns A collectable iterator with the same iteration behavior plus a collect() method
  *
  * @example
@@ -73,47 +75,62 @@ export interface CollectableIterator<T> extends AsyncIterableIterator<T> {
  *   yield 3;
  * }
  *
+ * // Without transformation
  * const iter = toCollectableIterator(generator());
  * const first = await iter.next(); // { value: 1, done: false }
  * const rest = await iter.collect(); // [2, 3]
+ *
+ * // With transformation
+ * const doubled = toCollectableIterator(generator(), x => x * 2);
+ * const all = await doubled.collect(); // [2, 4, 6]
  * ```
  */
-export function toCollectableIterator<T>(iterator: AsyncIterableIterator<T>): CollectableIterator<T> {
+export function toCollectableIterator<TSource, TResult = TSource>(
+    iterator: AsyncIterableIterator<TSource>,
+    transform?: (item: TSource) => TResult,
+): CollectableIterator<TResult> {
     let collected = false;
+    const transformFn = transform ?? ((item: TSource) => item as TSource & TResult);
 
-    const collectableIterator: CollectableIterator<T> = {
-        async next(): Promise<IteratorResult<T>> {
+    const collectableIterator: CollectableIterator<TResult> = {
+        async next(): Promise<IteratorResult<TResult>> {
             if (collected) {
                 return { value: undefined, done: true };
             }
-            return iterator.next();
+            const result = await iterator.next();
+            if (result.done) {
+                return { value: undefined, done: true };
+            }
+            return { value: transformFn(result.value), done: false };
         },
 
-        async collect(): Promise<T[]> {
+        async collect(): Promise<TResult[]> {
             if (collected) {
                 return [];
             }
             collected = true;
 
-            const results: T[] = [];
+            const results: TResult[] = [];
             for await (const item of iterator) {
-                results.push(item);
+                results.push(transformFn(item));
             }
             return results;
         },
 
-        [Symbol.asyncIterator](): AsyncIterableIterator<T> {
+        [Symbol.asyncIterator](): AsyncIterableIterator<TResult> {
             return collectableIterator;
         },
 
-        return(value): Promise<IteratorResult<T>> {
+        async return(value?: TResult): Promise<IteratorResult<TResult>> {
             collected = true;
-            return iterator.return?.(value) ?? Promise.resolve({ value: undefined, done: true });
+            await iterator.return?.(value);
+            return { value: undefined, done: true };
         },
 
-        throw(error): Promise<IteratorResult<T>> {
+        async throw(error?: unknown): Promise<IteratorResult<TResult>> {
             collected = true;
-            return iterator.throw?.(error) ?? Promise.reject(error);
+            await iterator.throw?.(error);
+            return Promise.reject(error);
         },
     };
 

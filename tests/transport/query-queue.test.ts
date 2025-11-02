@@ -57,8 +57,8 @@ describe("QueryQueue", () => {
             // Send DataRowDescription
             const rowDesc: DataRowDescription = {
                 columns: [
-                    { name: "id", typeOid: 23 },
-                    { name: "name", typeOid: 25 },
+                    { name: "id", oid: 23 },
+                    { name: "name", oid: 25 },
                 ],
             };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc);
@@ -80,7 +80,7 @@ describe("QueryQueue", () => {
             const enqueued = queue.enqueueNew();
 
             const rowDesc: DataRowDescription = {
-                columns: [{ name: "id", typeOid: 23 }],
+                columns: [{ name: "id", oid: 23 }],
             };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc);
 
@@ -119,7 +119,7 @@ describe("QueryQueue", () => {
             const enqueued = queue.enqueueNew();
 
             const rowDesc: DataRowDescription = {
-                columns: [{ name: "id", typeOid: 23 }],
+                columns: [{ name: "id", oid: 23 }],
             };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc);
 
@@ -158,7 +158,7 @@ describe("QueryQueue", () => {
             const query2 = queue.enqueueNew();
 
             // Process first query
-            const rowDesc1: DataRowDescription = { columns: [{ name: "a", typeOid: 23 }] };
+            const rowDesc1: DataRowDescription = { columns: [{ name: "a", oid: 23 }] };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc1);
 
             const row1: DataRow = { values: ["1"] };
@@ -172,7 +172,7 @@ describe("QueryQueue", () => {
             expect(response1.columns).toEqual([{ name: "a", oid: 23 }]);
 
             // Process second query
-            const rowDesc2: DataRowDescription = { columns: [{ name: "b", typeOid: 25 }] };
+            const rowDesc2: DataRowDescription = { columns: [{ name: "b", oid: 25 }] };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc2);
 
             const row2: DataRow = { values: ["hello"] };
@@ -246,14 +246,14 @@ describe("QueryQueue", () => {
             const query2 = queue.enqueueNew();
 
             // Complete first query normally
-            queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, { columns: [{ name: "a", typeOid: 23 }] });
+            queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, { columns: [{ name: "a", oid: 23 }] });
             queue.processFrame(FRAME_URNS.commandCompleteUrn, { complete: true });
 
             const response1 = await query1.promise;
             expect(response1.columns).toEqual([{ name: "a", oid: 23 }]);
 
             // Second query should still work after first completes
-            const rowDesc: DataRowDescription = { columns: [{ name: "id", typeOid: 25 }] };
+            const rowDesc: DataRowDescription = { columns: [{ name: "id", oid: 25 }] };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc);
 
             const complete: CommandComplete = { complete: true };
@@ -270,7 +270,7 @@ describe("QueryQueue", () => {
             const enqueued = queue.enqueueNew();
 
             const rowDesc: DataRowDescription = {
-                columns: [{ name: "id", typeOid: 23 }],
+                columns: [{ name: "id", oid: 23 }],
             };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc);
 
@@ -342,7 +342,7 @@ describe("QueryQueue", () => {
             const enqueued = queue.enqueueNew();
 
             const rowDesc: DataRowDescription = {
-                columns: [{ name: "optional", typeOid: 25 }],
+                columns: [{ name: "optional", oid: 25 }],
             };
             queue.processFrame(FRAME_URNS.dataRowDescriptionUrn, rowDesc);
 

@@ -9,7 +9,7 @@ import {
     isDataRowDescription,
     isErrorFrame,
 } from "./frames.ts";
-import { FRAME_URNS, type StatementResponse } from "./shared.ts";
+import { Column, FRAME_URNS, type StatementResponse } from "./shared.ts";
 import { type Deferred, createDeferred, emptyIterableIterator } from "./shims.ts";
 
 type RowIteratorResult = IteratorResult<(string | null)[]>;
@@ -41,7 +41,7 @@ function newRunningQuery(): RunningQuery {
     const rowBuffer: (string | null)[][] = []; // Buffer for rows that arrive before iteration starts or while the consumer is busy
     let completed = false;
     let rowDeferred: Deferred<RowIteratorResult> | null;
-    let columns: { name: string; oid: number }[] = [];
+    let columns: Column[] = [];
 
     function tryResolveRow(value: RowIteratorResult) {
         if (rowDeferred) {
@@ -89,7 +89,7 @@ function newRunningQuery(): RunningQuery {
         // Populate columns
         columns = descr.columns.map((col) => ({
             name: col.name,
-            oid: col.typeOid,
+            oid: col.oid,
         }));
         // Resolve the promise now that we have columns
         // The rows iterator was already created and is ready to stream

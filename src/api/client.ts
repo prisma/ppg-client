@@ -3,12 +3,11 @@
  */
 
 import type { CollectableIterator, RawParameter } from "../common/types.ts";
-
-/**
- * Creates a new client.
- * @param config Client configuration.
- */
-export declare function client(config: ClientConfig): Client;
+import { toCollectableIterator } from "../common/types.ts";
+import type { NullableString } from "../transport/frames.ts";
+import { httpTransport } from "../transport/http.ts";
+import type { BaseTransport, Column, TransportConfig } from "../transport/shared.ts";
+import { webSocketTransport } from "../transport/websocket.ts";
 
 /**
  * Base configuration shared between Client and Session configurations.
@@ -41,13 +40,13 @@ export interface ClientConfig extends BaseConfig {
  * Configuration for a database Session.
  * Allows per-session customization of parsing and serialization behavior.
  */
-export interface SessionConfig extends BaseConfig {}
+export interface SessionConfig extends BaseConfig { }
 
 /**
  * A mixin interface allowing single query execution.
  * Implemented by both Client and Session.
  */
-export interface Queryable {
+export interface Statements {
     /**
      * Executes a SQL query and returns the full result set with streaming rows.
      * Use this for SELECT queries or commands where you need to access result data.
@@ -86,7 +85,7 @@ export interface Queryable {
  * running individual raw queries or long running Sessions, which
  * can be used to implement interactive transactions.
  */
-export interface Client extends Queryable {
+export interface Client extends Statements {
     /**
      * Creates a new Session to run multiple queries interactively.
      * Sessions are useful for running transactions or maintaining state across queries.
@@ -98,14 +97,14 @@ export interface Client extends Queryable {
      * @returns A new Session instance
      *
      * ```ts
-     * const session = client.newSession();
+     * using session = await client.newSession();
      * await session.query("BEGIN");
      * await session.query("INSERT INTO users VALUES ($1, $2)", "Alice", 25);
      * await session.query("COMMIT");
      * await session.close();
      * ```
      */
-    newSession(config?: SessionConfig): Session;
+    newSession(config?: SessionConfig): Promise<Session>;
 }
 
 /**
@@ -113,16 +112,16 @@ export interface Client extends Queryable {
  * database. Multiple queries can be run while the Session is active.
  * The main use for Session is to run interactive transactions.
  */
-export interface Session extends Queryable, AsyncDisposable {
+export interface Session extends Statements, Disposable {
     /**
      * Gracefully closes the current Session. Please notice
      * This will not run any implicit transaction command: the database
      * will automatically rollback any pending transaction when
      * closing without commit.
      *
-     * This is an alias for [Symbol.asyncDispose]()
+     * This is an alias for [Symbol.dispose]()
      */
-    close(): PromiseLike<void>;
+    close(): void;
 
     /**
      * If true, the Session can still accept new queries. If false,
@@ -171,30 +170,7 @@ export interface Resultset {
     rows: CollectableIterator<Row>;
 }
 
-/**
- * Resultset column descriptor.
- */
-export interface Column {
-    /**
-     * Name of the column.
-     */
-    name: string;
 
-    /**
-     * Object identifier of the column type.
-     *
-     * If you need to know the column type name, you can use the `oid` to query
-     * the `pg_type` catalog:
-     *
-     * ```ts
-     * await client.run({
-     *   sql: `SELECT typname FROM pg_type WHERE oid = $1`,
-     *   parameters: [column.oid],
-     * });
-     * ```
-     */
-    oid: number;
-}
 
 /**
  * Single data row in a result set.
@@ -220,7 +196,7 @@ export interface ValueParser {
     /**
      * PostgreSQL type OID that this parser handles.
      */
-    readonly typeOid: number;
+    readonly oid: number;
 
     /**
      * Parses the raw string value from PostgreSQL into a JavaScript value.
@@ -271,5 +247,243 @@ export class DatabaseError extends Error {
         // biome-ignore lint:
         delete details.message;
         this.name = new.target.name;
+    }
+}
+
+/**
+ * Parses a standard PostgreSQL connection string into TransportConfig.
+ * Expects format: postgres://username:password@hostname:port/database
+ */
+function parseConnectionString(connectionString: string): TransportConfig {
+    const url = new URL(connectionString);
+
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
+        throw new Error(`Invalid connection string protocol: ${url.protocol}. Expected "postgres:" or "postgresql:"`);
+    }
+
+    const username = url.username;
+    const password = url.password;
+    const hostname = url.hostname;
+    const database = url.pathname.slice(1) || undefined; // Remove leading '/'
+
+    if (!username || !password) {
+        throw new Error("Connection string must include username and password");
+    }
+
+    if (!hostname) {
+        throw new Error("Connection string must include a hostname");
+    }
+
+    // Construct HTTP endpoint (using port 80 for now)
+    const httpPort = "54320";
+    const endpoint = `http://${hostname}:${httpPort}`;
+
+    return {
+        endpoint,
+        username,
+        password,
+        database,
+    };
+}
+
+const passThrough = <T>(v: T) => v;
+
+/**
+ * Default value parsers for common PostgreSQL types.
+ */
+const DEFAULT_PARSERS: ValueParser[] = [
+    // Boolean
+    { oid: 16, parse: (value) => value === "t" },
+    // Int2 (smallint)
+    { oid: 21, parse: (value) => (value === null ? null : Number.parseInt(value, 10)) },
+    // Int4 (integer)
+    { oid: 23, parse: (value) => (value === null ? null : Number.parseInt(value, 10)) },
+    // Int8 (bigint) - return as string to avoid precision loss
+    { oid: 20, parse: passThrough },
+    // Float4 (real)
+    { oid: 700, parse: (value) => (value === null ? null : Number.parseFloat(value)) },
+    // Float8 (double precision)
+    { oid: 701, parse: (value) => (value === null ? null : Number.parseFloat(value)) },
+    // Text
+    { oid: 25, parse: passThrough },
+    // Varchar
+    { oid: 1043, parse: passThrough },
+    // JSON
+    { oid: 114, parse: (value) => (value === null ? null : JSON.parse(value)) },
+    // JSONB
+    { oid: 3802, parse: (value) => (value === null ? null : JSON.parse(value)) },
+];
+
+const serializeToString = (x: NonNullable<unknown>) => x.toString();
+
+/**
+ * Default value serializers for common JavaScript types.
+ */
+const DEFAULT_SERIALIZERS: ValueSerializer<unknown>[] = [
+    // Date serializer
+    {
+        supports: (value): value is Date => value instanceof Date,
+        serialize: (value: Date) => value.toISOString(),
+    },
+    // BigInt serializer
+    {
+        supports: (value): value is bigint => typeof value === "bigint",
+        serialize: serializeToString,
+    },
+    // Boolean serializer
+    {
+        supports: (value): value is boolean => typeof value === "boolean",
+        serialize: (value: boolean) => (value ? "t" : "f"),
+    },
+    // Number serializer
+    {
+        supports: (value): value is number => typeof value === "number",
+        serialize: serializeToString,
+    },
+];
+
+/**
+ * Creates a new client.
+ * @param config Client configuration.
+ */
+export function client(config: ClientConfig): Client {
+    const transportConfig = parseConnectionString(config.connectionString);
+
+    // Merge parsers: user parsers override defaults
+    const parsersMap = [...DEFAULT_PARSERS, ...(config.parsers || [])].reduce(
+        (map, parser) => map.set(parser.oid, parser),
+        new Map<number, ValueParser>(),
+    );
+    const parsers = [...parsersMap.values()];
+
+    // Merge serializers: user serializers take precedence
+    const serializers = [...(config.serializers || []), ...DEFAULT_SERIALIZERS];
+
+    const transport = httpTransport(transportConfig);
+
+    // Create client statements methods
+    const statements = createStatements(transport, serializers, parsers);
+
+    async function newSession(sessionConfig?: SessionConfig): Promise<Session> {
+
+        const sessionTransport = webSocketTransport(transportConfig);
+        await sessionTransport.connect();
+
+        // Merge session-specific parsers/serializers with client defaults
+        const sessionParsersMap =
+            sessionConfig?.parsers?.reduce((map, parser) => map.set(parser.oid, parser), new Map(parsersMap)) ??
+            new Map(parsersMap);
+        const sessionParsers = [...sessionParsersMap.values()];
+
+        const sessionSerializers = [
+            ...(sessionConfig?.serializers || []),
+            ...(config.serializers || []),
+            ...DEFAULT_SERIALIZERS,
+        ];
+
+        // Create session statements methods
+        const sessionStatements = createStatements(sessionTransport, sessionSerializers, sessionParsers);
+
+        const session: Session = {
+            ...sessionStatements,
+            close() {
+                sessionTransport.close();
+            },
+
+            get active() {
+                return sessionTransport.isConnected();
+            },
+
+            [Symbol.dispose]() {
+                this.close();
+            },
+        };
+
+        return session;
+    }
+
+    return {
+        ...statements,
+        newSession,
+    };
+}
+
+// Helper to create query/exec methods with the given serializers and parsers
+function createStatements(
+    transport: BaseTransport,
+    serializers: ValueSerializer<unknown>[],
+    parsers: ValueParser[],
+): Statements {
+    function transformResponse(response: {
+        columns: Column[];
+        rows: CollectableIterator<(string | null)[]>;
+    }): Resultset {
+        const columns: Column[] = response.columns.map((col: Column) => ({
+            name: col.name,
+            oid: col.oid,
+        }));
+
+        const rows = toCollectableIterator(response.rows, (rawRow) => parseSessionRow(parsers, columns, rawRow));
+
+        return { columns, rows };
+    }
+
+    return {
+        async query(sql: string, ...params: unknown[]): Promise<Resultset> {
+            const rawParams = serializeSessionParams(serializers, params);
+            const response = await transport.statement("query", sql, rawParams);
+            return transformResponse(response);
+        },
+
+        async exec(sql: string, ...params: unknown[]): Promise<number> {
+            const rawParams = serializeSessionParams(serializers, params);
+            const response = await transport.statement("exec", sql, rawParams);
+
+            // the first row always has 1 column being the count of rows affected
+            const firstRow = await response.rows.next();
+            // sanity check. Should not be needed, but better to verify for protocol consistence.
+            assertRowAffectedResult(firstRow);
+
+            return Number.parseInt(firstRow.value[0], 10);
+        },
+    };
+}
+
+function serializeSessionParams(serializers: ValueSerializer<unknown>[], params: unknown[]): RawParameter[] {
+    return params.map((param) => {
+        if (param === null || param === undefined) {
+            return null;
+        }
+
+        // Try custom serializers first, then default to string conversion
+        const serializer = serializers.find((s) => s.supports(param));
+        return serializer ? serializer.serialize(param) : typeof param === "string" ? param : String(param);
+    });
+}
+
+function parseSessionRow(
+    parsers: ValueParser[],
+    columns: Column[],
+    rawValues: NullableString[],
+): Row {
+    const values = rawValues.map((value, index) => {
+        if (value === null) {
+            return null;
+        }
+
+        const columnOid = columns[index].oid;
+        const parser = parsers.find((p) => p.oid === columnOid);
+
+        return parser ? parser.parse(value) : value;
+    });
+
+    return { values };
+}
+
+function assertRowAffectedResult(
+    x: IteratorResult<(string | null)[], unknown> | undefined,
+): asserts x is { done: false; value: [string] } {
+    if (!x || x.done || x.value?.length !== 1 || !x.value[0] || !/^\d+$/.test(x.value[0])) {
+        throw new Error(`Protocol error: missing rowsAffected value in exec response: ${JSON.stringify(x)}`);
     }
 }

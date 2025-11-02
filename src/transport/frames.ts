@@ -13,9 +13,11 @@ import {
 } from "../common/types.ts";
 import { utf8ByteLength } from "./shims.ts";
 
+export type NullableString = string | null;
+
 export type InlineQueryParameter = {
     type: ParameterFormat;
-    value: string | null;
+    value: NullableString;
 };
 
 export type ExtendedQueryParameter = {
@@ -50,7 +52,7 @@ export type WebSocketAuthFrame = {
 
 export type ColumnMetadata = {
     name: string;
-    typeOid: number;
+    oid: number;
 };
 
 export type DataRowDescription = {
@@ -58,7 +60,7 @@ export type DataRowDescription = {
 };
 
 export type DataRow = {
-    values: (string | null)[];
+    values: NullableString[];
 };
 
 export type CommandComplete = {
