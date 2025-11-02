@@ -136,3 +136,20 @@ export function toCollectableIterator<TSource, TResult = TSource>(
 
     return collectableIterator;
 }
+
+
+
+export class DatabaseError extends Error {
+    readonly code: string;
+    readonly details: Record<string, string>;
+    constructor(message: string, code: string, details: Record<string, string>) {
+        super(message);
+        this.code = code;
+        this.details = details;
+        // biome-ignore lint:
+        delete details.code;
+        // biome-ignore lint:
+        delete details.message;
+        this.name = new.target.name;
+    }
+}

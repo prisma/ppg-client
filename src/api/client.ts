@@ -17,7 +17,7 @@ interface BaseConfig {
      * Custom value parsers for specific PostgreSQL type OIDs.
      * These override the default parsing behavior for their respective types.
      */
-    parsers?: ValueParser[];
+    parsers?: ValueParser<unknown>[];
 
     /**
      * Custom value serializers for specific JavaScript types.
@@ -192,7 +192,7 @@ export interface Row {
  * A default set of parsers is provided for standard PostgreSQL types,
  * but these can be overridden by providing custom parsers in the client configuration.
  */
-export interface ValueParser {
+export interface ValueParser<T> {
     /**
      * PostgreSQL type OID that this parser handles.
      */
@@ -204,7 +204,7 @@ export interface ValueParser {
      * @param value - Raw string value from PostgreSQL, or null
      * @returns Parsed JavaScript value
      */
-    parse<T>(value: string | null): T;
+    parse(value: string | null): T;
 }
 
 /**
@@ -235,21 +235,6 @@ export interface ValueSerializer<T> {
     serialize(value: T): QueryParameter;
 }
 
-export class DatabaseError extends Error {
-    readonly code: string;
-    readonly details: Record<string, string>;
-    constructor(message: string, code: string, details: Record<string, string>) {
-        super(message);
-        this.code = code;
-        this.details = details;
-        // biome-ignore lint:
-        delete details.code;
-        // biome-ignore lint:
-        delete details.message;
-        this.name = new.target.name;
-    }
-}
-
 /**
  * Parses a standard PostgreSQL connection string into TransportConfig.
  * Expects format: postgres://username:password@hostname:port/database
@@ -270,10 +255,6 @@ function parseConnectionString(connectionString: string): TransportConfig {
         throw new Error("Connection string must include username and password");
     }
 
-    if (!hostname) {
-        throw new Error("Connection string must include a hostname");
-    }
-
     // Construct HTTP endpoint (using port 80 for now)
     const httpPort = "54320";
     const endpoint = `http://${hostname}:${httpPort}`;
@@ -287,31 +268,33 @@ function parseConnectionString(connectionString: string): TransportConfig {
 }
 
 const passThrough = <T>(v: T) => v;
+type NonNullParse = (value: string) => unknown
+const nullPassThrough = <T>(fn: NonNullParse) => (v: string | null) => v === null ? null : fn(v);
 
 /**
  * Default value parsers for common PostgreSQL types.
  */
-const DEFAULT_PARSERS: ValueParser[] = [
+const DEFAULT_PARSERS: ValueParser<unknown>[] = [
     // Boolean
     { oid: 16, parse: (value) => value === "t" },
     // Int2 (smallint)
-    { oid: 21, parse: (value) => (value === null ? null : Number.parseInt(value, 10)) },
+    { oid: 21, parse: nullPassThrough(value => Number.parseInt(value, 10)) },
     // Int4 (integer)
-    { oid: 23, parse: (value) => (value === null ? null : Number.parseInt(value, 10)) },
-    // Int8 (bigint) - return as string to avoid precision loss
-    { oid: 20, parse: passThrough },
+    { oid: 23, parse: nullPassThrough(value => Number.parseInt(value, 10)) },
+    // Int8 (bigint) - parse as BigInt to preserve precision
+    { oid: 20, parse: nullPassThrough(value => BigInt(value)) },
     // Float4 (real)
-    { oid: 700, parse: (value) => (value === null ? null : Number.parseFloat(value)) },
+    { oid: 700, parse: nullPassThrough(value => Number.parseFloat(value)) },
     // Float8 (double precision)
-    { oid: 701, parse: (value) => (value === null ? null : Number.parseFloat(value)) },
+    { oid: 701, parse: nullPassThrough(value => Number.parseFloat(value)) },
     // Text
     { oid: 25, parse: passThrough },
     // Varchar
     { oid: 1043, parse: passThrough },
     // JSON
-    { oid: 114, parse: (value) => (value === null ? null : JSON.parse(value)) },
+    { oid: 114, parse: nullPassThrough(value => JSON.parse(value)) },
     // JSONB
-    { oid: 3802, parse: (value) => (value === null ? null : JSON.parse(value)) },
+    { oid: 3802, parse: nullPassThrough(value => JSON.parse(value)) },
 ];
 
 const serializeToString = (x: NonNullable<unknown>) => x.toString();
@@ -352,7 +335,7 @@ export function client(config: ClientConfig): Client {
     // Merge parsers: user parsers override defaults
     const parsersMap = [...DEFAULT_PARSERS, ...(config.parsers || [])].reduce(
         (map, parser) => map.set(parser.oid, parser),
-        new Map<number, ValueParser>(),
+        new Map<number, ValueParser<unknown>>(),
     );
     const parsers = [...parsersMap.values()];
 
@@ -412,7 +395,7 @@ export function client(config: ClientConfig): Client {
 function createStatements(
     transport: BaseTransport,
     serializers: ValueSerializer<unknown>[],
-    parsers: ValueParser[],
+    parsers: ValueParser<unknown>[],
 ): Statements {
     function transformResponse(response: {
         columns: Column[];
@@ -462,18 +445,13 @@ function serializeSessionParams(serializers: ValueSerializer<unknown>[], params:
 }
 
 function parseSessionRow(
-    parsers: ValueParser[],
+    parsers: ValueParser<unknown>[],
     columns: Column[],
     rawValues: NullableString[],
 ): Row {
     const values = rawValues.map((value, index) => {
-        if (value === null) {
-            return null;
-        }
-
         const columnOid = columns[index].oid;
         const parser = parsers.find((p) => p.oid === columnOid);
-
         return parser ? parser.parse(value) : value;
     });
 

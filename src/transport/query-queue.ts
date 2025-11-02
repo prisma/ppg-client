@@ -1,5 +1,4 @@
-import { DatabaseError } from "../api/client.ts";
-import { toCollectableIterator } from "../common/types.ts";
+import { toCollectableIterator, DatabaseError } from "../common/types.ts";
 import {
     type DataRow,
     type DataRowDescription,

@@ -1,5 +1,5 @@
-import { DatabaseError } from "../api/client.ts";
-import { toCollectableIterator } from "../common/types.ts";
+
+import { DatabaseError, toCollectableIterator } from "../common/types.ts";
 import { isCommandComplete, isDataRow, isDataRowDescription, isErrorFrame } from "./frames.ts";
 import type { Column, StatementResponse } from "./shared.ts";
 
