@@ -1,5 +1,4 @@
-
-const arrayBufferType: BinaryType = "arraybuffer"
+const arrayBufferType: BinaryType = "arraybuffer";
 
 /**
  * Mock WebSocket implementation for testing
@@ -21,17 +20,17 @@ export class MockWebSocket implements WebSocket {
     url: string;
     protocol: string;
 
-    onclose: ((ev: WebSocketEventMap['close']) => void) | null = null
-    onerror: ((ev: WebSocketEventMap['error']) => void) | null = null
-    onmessage: ((ev: WebSocketEventMap['message']) => void) | null = null
-    onopen: ((ev: WebSocketEventMap['open']) => void) | null = null
+    onclose: ((ev: WebSocketEventMap["close"]) => void) | null = null;
+    onerror: ((ev: WebSocketEventMap["error"]) => void) | null = null;
+    onmessage: ((ev: WebSocketEventMap["message"]) => void) | null = null;
+    onopen: ((ev: WebSocketEventMap["open"]) => void) | null = null;
 
     sentMessages: unknown[] = [];
-    bufferedAmount: number = 0;
+    bufferedAmount = 0;
 
     constructor(url: string | URL, protocols?: string | string[]) {
         this.url = url.toString();
-        this.protocol = typeof protocols === 'string' ? protocols : protocols ? protocols[0] : "";
+        this.protocol = typeof protocols === "string" ? protocols : protocols ? protocols[0] : "";
 
         // Simulate async connection
         setTimeout(() => {
@@ -83,7 +82,7 @@ export class MockWebSocket implements WebSocket {
     }
 }
 
-export function nextTick() {
+export function runEventLoop() {
     return new Promise((resolve) => setTimeout(resolve, 0));
 }
 

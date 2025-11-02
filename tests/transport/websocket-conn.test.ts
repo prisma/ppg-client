@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
-import { MockWebSocket, createMockWebSocketSetup, nextTick } from "./websocket-test-utils.ts";
 import type { WsTransportConnection } from "../../src/transport/websocket-conn.ts";
+import { MockWebSocket, createMockWebSocketSetup, runEventLoop } from "./websocket-test-utils.ts";
 
 // Setup mock WebSocket
 const mockWsSetup = createMockWebSocketSetup();
@@ -48,7 +48,7 @@ describe("wsTransportConnection", () => {
         it("should construct correct WebSocket URL", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
 
-            await nextTick()
+            await runEventLoop();
 
             expect(getMockWs().url).toBe("ws://localhost:3000/db/websocket");
             expect(getMockWs().protocol).toBe("prisma-postgres-1.0");
@@ -64,7 +64,7 @@ describe("wsTransportConnection", () => {
             };
 
             const connPromise = wsTransportConnection(config);
-            await nextTick()
+            await runEventLoop();
 
             expect(getMockWs().url).toContain("database=mydb");
 
@@ -73,7 +73,7 @@ describe("wsTransportConnection", () => {
 
         it("should set binary type to arraybuffer", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             expect(getMockWs().binaryType).toBe("arraybuffer");
 
@@ -84,11 +84,11 @@ describe("wsTransportConnection", () => {
     describe("authentication", () => {
         it("should send authentication frame on open", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             expect(getMockWs().sentMessages.length).toBe(1);
             const msg = getMockWs().sentMessages[0];
-            expect(msg).to.be.a('string')
+            expect(msg).to.be.a("string");
 
             const authFrame = JSON.parse(msg as string);
             expect(authFrame).toEqual({
@@ -101,7 +101,7 @@ describe("wsTransportConnection", () => {
 
         it("should resolve when first message is received", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             // Simulate authentication success
 
@@ -109,13 +109,12 @@ describe("wsTransportConnection", () => {
             expect(conn).toBeDefined();
             expect(conn.isReady()).toBe(true);
         });
-
     });
 
     describe("message parsing", () => {
         it("should parse URN + payload message pattern", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -124,9 +123,11 @@ describe("wsTransportConnection", () => {
 
             // Send DataRowDescription (URN + payload)
             getMockWs().simulateMessage(FRAME_URNS.dataRowDescriptionUrn);
-            getMockWs().simulateMessage(JSON.stringify({
-                columns: [{ name: "id", typeOid: 23 }],
-            }));
+            getMockWs().simulateMessage(
+                JSON.stringify({
+                    columns: [{ name: "id", typeOid: 23 }],
+                }),
+            );
 
             // Complete the query
             getMockWs().simulateMessage(FRAME_URNS.commandCompleteUrn);
@@ -138,7 +139,7 @@ describe("wsTransportConnection", () => {
 
         it("should handle multiple messages in sequence", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -146,9 +147,11 @@ describe("wsTransportConnection", () => {
 
             // Send row description
             getMockWs().simulateMessage(FRAME_URNS.dataRowDescriptionUrn);
-            getMockWs().simulateMessage(JSON.stringify({
-                columns: [{ name: "id", typeOid: 23 }],
-            }));
+            getMockWs().simulateMessage(
+                JSON.stringify({
+                    columns: [{ name: "id", typeOid: 23 }],
+                }),
+            );
 
             // Send multiple data rows
             const rowsPromise = (async () => {
@@ -156,17 +159,17 @@ describe("wsTransportConnection", () => {
                 return await response.rows.collect();
             })();
 
-            await nextTick()
+            await runEventLoop();
 
             getMockWs().simulateMessage(FRAME_URNS.dataRowUrn);
             getMockWs().simulateMessage(JSON.stringify({ values: ["1"] }));
 
-            await nextTick()
+            await runEventLoop();
 
             getMockWs().simulateMessage(FRAME_URNS.dataRowUrn);
             getMockWs().simulateMessage(JSON.stringify({ values: ["2"] }));
 
-            await nextTick()
+            await runEventLoop();
 
             getMockWs().simulateMessage(FRAME_URNS.commandCompleteUrn);
             getMockWs().simulateMessage(JSON.stringify({ complete: true }));
@@ -179,7 +182,7 @@ describe("wsTransportConnection", () => {
     describe("error handling", () => {
         it("should reject binary messages and abort all queries", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -193,12 +196,8 @@ describe("wsTransportConnection", () => {
             getMockWs().simulateMessage(binaryData);
 
             // All queries should be aborted
-            await expect(query1.promise).rejects.toThrow(
-                "Protocol error: expected text message, received object"
-            );
-            await expect(query2.promise).rejects.toThrow(
-                "Protocol error: expected text message, received object"
-            );
+            await expect(query1.promise).rejects.toThrow("Protocol error: expected text message, received object");
+            await expect(query2.promise).rejects.toThrow("Protocol error: expected text message, received object");
 
             // WebSocket should be closed with protocol error code
             expect(closeSpy).toHaveBeenCalledWith(1002, "Protocol error: binary messages not supported");
@@ -206,7 +205,7 @@ describe("wsTransportConnection", () => {
 
         it("should abort all queries on WebSocket error after auth", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -221,7 +220,7 @@ describe("wsTransportConnection", () => {
 
         it("should handle WebSocket error without message property", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -230,7 +229,7 @@ describe("wsTransportConnection", () => {
             // Simulate error event without message property
             const onerror = getMockWs().onerror;
             if (onerror) {
-                onerror({ type: "error" } as any);
+                onerror({ type: "error" } as Event);
             }
 
             await expect(query.promise).rejects.toThrow("WebSocket error");
@@ -238,16 +237,18 @@ describe("wsTransportConnection", () => {
 
         it("should handle error frame from server", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
             const query = conn.enqueueNewQuery();
 
             getMockWs().simulateMessage(FRAME_URNS.errorUrn);
-            getMockWs().simulateMessage(JSON.stringify({
-                error: { message: "syntax error", code: "42601" },
-            }));
+            getMockWs().simulateMessage(
+                JSON.stringify({
+                    error: { message: "syntax error", code: "42601" },
+                }),
+            );
 
             await expect(query.promise).rejects.toThrow("syntax error");
         });
@@ -256,7 +257,7 @@ describe("wsTransportConnection", () => {
     describe("close handling", () => {
         it("should abort all queries on close after auth", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -271,7 +272,7 @@ describe("wsTransportConnection", () => {
 
         it("should close connection with normal closure code", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -286,7 +287,7 @@ describe("wsTransportConnection", () => {
     describe("send with backpressure", () => {
         it("should send data when not busy", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -345,11 +346,11 @@ describe("wsTransportConnection", () => {
 
             // Exponential backoff: 5, 10, 20, 40, 80, then capped at 100
             // Let's go through many iterations to hit the cap
-            await vi.advanceTimersByTimeAsync(5);   // 5ms
-            await vi.advanceTimersByTimeAsync(10);  // 10ms
-            await vi.advanceTimersByTimeAsync(20);  // 20ms
-            await vi.advanceTimersByTimeAsync(40);  // 40ms
-            await vi.advanceTimersByTimeAsync(80);  // 80ms
+            await vi.advanceTimersByTimeAsync(5); // 5ms
+            await vi.advanceTimersByTimeAsync(10); // 10ms
+            await vi.advanceTimersByTimeAsync(20); // 20ms
+            await vi.advanceTimersByTimeAsync(40); // 40ms
+            await vi.advanceTimersByTimeAsync(80); // 80ms
             await vi.advanceTimersByTimeAsync(100); // 100ms (capped)
 
             // Clear buffer after many iterations
@@ -366,7 +367,7 @@ describe("wsTransportConnection", () => {
         it("should actually wait in the while loop (real timers for coverage)", async () => {
             // This test uses real timers to ensure coverage tools see the while loop execute
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -390,7 +391,7 @@ describe("wsTransportConnection", () => {
     describe("isReady()", () => {
         it("should return true when connection is open", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 
@@ -399,7 +400,7 @@ describe("wsTransportConnection", () => {
 
         it("should return false when connection is closed", async () => {
             const connPromise = wsTransportConnection(defaultConfig);
-            await nextTick()
+            await runEventLoop();
 
             const conn = await connPromise;
 

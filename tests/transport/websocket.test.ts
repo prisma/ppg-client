@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { MockWebSocket, createMockWebSocketSetup, nextTick } from "./websocket-test-utils.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RequestFrame } from "../../src/transport/frames.ts";
 import type { TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
 import type { WebSocketTransport } from "../../src/transport/websocket.ts";
+import { MockWebSocket, createMockWebSocketSetup, runEventLoop } from "./websocket-test-utils.ts";
 
 // Setup mock WebSocket
 const mockWsSetup = createMockWebSocketSetup();
@@ -23,12 +24,12 @@ describe("WebSocketTransport", () => {
         password: "testpass",
     };
 
-    let webSocketTransport: (config: TransportConfig) => Promise<WebSocketTransport>;
+    let webSocketTransport: (config: TransportConfig) => WebSocketTransport;
 
     beforeEach(async () => {
         vi.clearAllMocks();
         mockWsSetup.reset();
-        global.WebSocket = MockWebSocket as any;
+        global.WebSocket = MockWebSocket;
 
         const module = await import("../../src/transport/websocket.ts");
         webSocketTransport = module.webSocketTransport;
@@ -42,9 +43,9 @@ describe("WebSocketTransport", () => {
 
     // Helper to complete authentication
     async function authenticateTransport() {
-        const transportPromise = webSocketTransport(defaultConfig);
-        await nextTick()
-        return await transportPromise;
+        const transport = webSocketTransport(defaultConfig);
+        await transport.connect();
+        return transport;
     }
 
     // Helper to simulate a complete query response
@@ -78,7 +79,7 @@ describe("WebSocketTransport", () => {
             const sentMessages = getMockWs().sentMessages;
             expect(sentMessages.length).toBeGreaterThan(0);
 
-            expect(sentMessages[0]).to.be.a('string')
+            expect(sentMessages[0]).to.be.a("string");
 
             const authFrame = JSON.parse(sentMessages[0] as string);
             expect(authFrame).toEqual({
@@ -95,7 +96,7 @@ describe("WebSocketTransport", () => {
             const queryPromise = transport.statement("query", "SELECT id, name FROM users", []);
 
             // Wait for frames to be sent
-            await nextTick()
+            await runEventLoop();
 
             // Verify frames were sent
             const sentMessages = getMockWs().sentMessages;
@@ -104,7 +105,7 @@ describe("WebSocketTransport", () => {
             // Find the query descriptor frame
             const queryDescriptorIndex = sentMessages.indexOf(FRAME_URNS.queryDescriptorUrn);
 
-            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a('string')
+            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a("string");
 
             const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1] as string);
             expect(queryDescriptor).toMatchObject({
@@ -120,7 +121,7 @@ describe("WebSocketTransport", () => {
                 [
                     ["1", "Alice"],
                     ["2", "Bob"],
-                ]
+                ],
             );
 
             const response = await queryPromise;
@@ -142,13 +143,13 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("query", "SELECT * FROM users WHERE id = $1", ["42"]);
 
-            await nextTick()
+            await runEventLoop();
 
             // Verify query frame with parameters
             const sentMessages = getMockWs().sentMessages;
             const queryDescriptorIndex = sentMessages.indexOf(FRAME_URNS.queryDescriptorUrn);
 
-            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a('string')
+            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a("string");
 
             const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1] as string);
 
@@ -168,12 +169,12 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("exec", "INSERT INTO users (name) VALUES ($1)", ["Charlie"]);
 
-            await nextTick()
+            await runEventLoop();
 
             const sentMessages = getMockWs().sentMessages;
             const queryDescriptorIndex = sentMessages.indexOf(FRAME_URNS.queryDescriptorUrn);
 
-            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a('string')
+            expect(sentMessages[queryDescriptorIndex + 1]).to.be.a("string");
 
             const queryDescriptor = JSON.parse(sentMessages[queryDescriptorIndex + 1] as string);
 
@@ -192,7 +193,7 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("query", "SELECT * FROM users WHERE id = -1", []);
 
-            await nextTick()
+            await runEventLoop();
 
             simulateQueryResponse([{ name: "id", typeOid: 23 }], []);
 
@@ -206,7 +207,7 @@ describe("WebSocketTransport", () => {
 
             // First query
             const query1Promise = transport.statement("query", "SELECT 1", []);
-            await nextTick()
+            await runEventLoop();
             simulateQueryResponse([{ name: "?column?", typeOid: 23 }], [["1"]]);
             const response1 = await query1Promise;
             const rows1 = await response1.rows.collect();
@@ -214,7 +215,7 @@ describe("WebSocketTransport", () => {
 
             // Second query
             const query2Promise = transport.statement("query", "SELECT 2", []);
-            await nextTick()
+            await runEventLoop();
             simulateQueryResponse([{ name: "?column?", typeOid: 23 }], [["2"]]);
             const response2 = await query2Promise;
             const rows2 = await response2.rows.collect();
@@ -229,7 +230,7 @@ describe("WebSocketTransport", () => {
             const query2Promise = transport.statement("query", "SELECT 'query2'", []);
             const query3Promise = transport.statement("query", "SELECT 'query3'", []);
 
-            await nextTick()
+            await runEventLoop();
 
             // Verify frames were sent in order (not interleaved)
             const sentMessages = getMockWs().sentMessages;
@@ -245,9 +246,9 @@ describe("WebSocketTransport", () => {
             expect(urnIndices.length).toBe(3);
 
             // Verify each query's frames are contiguous (URN followed immediately by payload)
-            expect(sentMessages[urnIndices[0] + 1]).to.be.a('string')
-            expect(sentMessages[urnIndices[1] + 1]).to.be.a('string')
-            expect(sentMessages[urnIndices[2] + 1]).to.be.a('string')
+            expect(sentMessages[urnIndices[0] + 1]).to.be.a("string");
+            expect(sentMessages[urnIndices[1] + 1]).to.be.a("string");
+            expect(sentMessages[urnIndices[2] + 1]).to.be.a("string");
 
             const query1Data = JSON.parse(sentMessages[urnIndices[0] + 1] as string);
             const query2Data = JSON.parse(sentMessages[urnIndices[1] + 1] as string);
@@ -281,9 +282,7 @@ describe("WebSocketTransport", () => {
             // Close the connection
             getMockWs().readyState = MockWebSocket.CLOSED;
 
-            await expect(transport.statement("query", "SELECT 1", [])).rejects.toThrow(
-                "WebSocket is not connected"
-            );
+            await expect(transport.statement("query", "SELECT 1", [])).rejects.toThrow("WebSocket is not connected");
         });
 
         it("should handle server error responses", async () => {
@@ -291,7 +290,7 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("query", "SELECT * FROM nonexistent", []);
 
-            await nextTick()
+            await runEventLoop();
 
             // Simulate error response
             getMockWs().simulateMessage(FRAME_URNS.errorUrn);
@@ -301,7 +300,7 @@ describe("WebSocketTransport", () => {
                         message: 'relation "nonexistent" does not exist',
                         code: "42P01",
                     },
-                })
+                }),
             );
 
             await expect(queryPromise).rejects.toThrow('relation "nonexistent" does not exist');
@@ -312,7 +311,7 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("query", "SELECT 1", []);
 
-            await nextTick()
+            await runEventLoop();
 
             // Simulate connection close
             getMockWs().simulateClose(1006, "Connection lost");
@@ -327,8 +326,8 @@ describe("WebSocketTransport", () => {
             vi.spyOn(await import("../../src/transport/frames.ts"), "requestFrames").mockResolvedValue([
                 {
                     type: "text",
-                    data: 12345 as any, // Unsupported: number
-                },
+                    data: 12345 as unknown, // Unsupported: number
+                } as RequestFrame,
             ]);
 
             const queryPromise = transport.statement("query", "SELECT $1", []);
@@ -360,17 +359,16 @@ describe("WebSocketTransport", () => {
             const transport = await authenticateTransport();
 
             // Mock requestFrames to return an ExtendedParamFrame with string data
-            const { requestFrames } = await import("../../src/transport/frames.ts");
             vi.spyOn(await import("../../src/transport/frames.ts"), "requestFrames").mockResolvedValue([
                 {
                     type: "text",
                     data: "Direct string data",
-                } as any,
+                } as RequestFrame,
             ]);
 
             const queryPromise = transport.statement("query", "SELECT $1", []);
 
-            await nextTick()
+            await runEventLoop();
 
             const sentMessages = getMockWs().sentMessages;
             expect(sentMessages).toContain(FRAME_URNS.textParamUrn);
@@ -397,11 +395,9 @@ describe("WebSocketTransport", () => {
 
             // Create a large string that will trigger extended parameter handling
             const largeText = "x".repeat(2000); // Over 1KB threshold
-            const queryPromise = transport.statement("query", "INSERT INTO docs (content) VALUES ($1)", [
-                largeText,
-            ]);
+            const queryPromise = transport.statement("query", "INSERT INTO docs (content) VALUES ($1)", [largeText]);
 
-            await nextTick()
+            await runEventLoop();
 
             // Verify extended text parameter frame was sent
             const sentMessages = getMockWs().sentMessages;
@@ -434,7 +430,7 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("query", "INSERT INTO docs (content) VALUES ($1)", [textParam]);
 
-            await nextTick()
+            await runEventLoop();
 
             const sentMessages = getMockWs().sentMessages;
             expect(sentMessages).toContain(FRAME_URNS.textParamUrn);
@@ -462,7 +458,7 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("query", "INSERT INTO blobs VALUES ($1)", [binaryParam]);
 
-            await nextTick()
+            await runEventLoop();
 
             const sentMessages = getMockWs().sentMessages;
             expect(sentMessages).toContain(FRAME_URNS.binaryParamUrn);
@@ -495,11 +491,9 @@ describe("WebSocketTransport", () => {
             });
             const streamParam = boundedByteStreamParameter(stream, "text", encoder.encode(largeText).byteLength);
 
-            const queryPromise = transport.statement("query", "INSERT INTO docs (content) VALUES ($1)", [
-                streamParam,
-            ]);
+            const queryPromise = transport.statement("query", "INSERT INTO docs (content) VALUES ($1)", [streamParam]);
 
-            await nextTick()
+            await runEventLoop();
 
             const sentMessages = getMockWs().sentMessages;
             expect(sentMessages).toContain(FRAME_URNS.textParamUrn);
@@ -533,7 +527,7 @@ describe("WebSocketTransport", () => {
 
             const queryPromise = transport.statement("query", "INSERT INTO blobs VALUES ($1)", [streamParam]);
 
-            await nextTick()
+            await runEventLoop();
 
             const sentMessages = getMockWs().sentMessages;
             expect(sentMessages).toContain(FRAME_URNS.binaryParamUrn);

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { createMultipartStream } from "../../src/transport/multipart";
-import { byteArrayParameter, boundedByteStreamParameter, BINARY, TEXT } from "../../src/common/types";
-import { RequestFrame } from "../../src/transport/frames";
+import { describe, expect, it } from "vitest";
+import { BINARY, TEXT, boundedByteStreamParameter, byteArrayParameter } from "../../src/common/types.ts";
+import type { RequestFrame } from "../../src/transport/frames.ts";
+import { createMultipartStream } from "../../src/transport/multipart.ts";
 
 describe("createMultipartStream", () => {
     async function streamToString(stream: ReadableStream<Uint8Array>): Promise<string> {
@@ -20,9 +20,7 @@ describe("createMultipartStream", () => {
 
     describe("Basic Functionality", () => {
         it("should create multipart stream with query descriptor", async () => {
-            const frames: RequestFrame[] = [
-                { query: "SELECT 1", parameters: [] }
-            ];
+            const frames: RequestFrame[] = [{ query: "SELECT 1", parameters: [] }];
 
             const stream = createMultipartStream(frames, "boundary123");
             const result = await streamToString(stream);
@@ -34,9 +32,7 @@ describe("createMultipartStream", () => {
         });
 
         it("should create multipart stream with exec descriptor", async () => {
-            const frames: RequestFrame[] = [
-                { exec: "INSERT INTO users (name) VALUES ('test')" }
-            ];
+            const frames: RequestFrame[] = [{ exec: "INSERT INTO users (name) VALUES ('test')" }];
 
             const stream = createMultipartStream(frames, "boundary456");
             const result = await streamToString(stream);
@@ -50,7 +46,7 @@ describe("createMultipartStream", () => {
         it("should handle plain string for text parameter", async () => {
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: 11 }] },
-                { type: "text", data: "hello world" }
+                { type: "text", data: "hello world" },
             ];
 
             const stream = createMultipartStream(frames, "boundary");
@@ -63,7 +59,7 @@ describe("createMultipartStream", () => {
         it("should handle plain string for binary parameter", async () => {
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "binary", byteSize: 11 }] },
-                { type: "binary", data: "binary data" }
+                { type: "binary", data: "binary data" },
             ];
 
             const stream = createMultipartStream(frames, "boundary");
@@ -79,7 +75,7 @@ describe("createMultipartStream", () => {
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: textData.byteLength }] },
-                { type: "text", data: param }
+                { type: "text", data: param },
             ];
 
             const stream = createMultipartStream(frames, "boundary");
@@ -95,14 +91,14 @@ describe("createMultipartStream", () => {
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "binary", byteSize: binaryData.byteLength }] },
-                { type: "binary", data: param }
+                { type: "binary", data: param },
             ];
 
             const stream = createMultipartStream(frames, "boundary");
             const result = await streamToString(stream);
 
             expect(result).toContain('name="urn:prisma:query:param:binary"');
-            expect(result).toContain('Content-Type: application/octet-stream');
+            expect(result).toContain("Content-Type: application/octet-stream");
         });
 
         it("should handle text BoundedByteStream", async () => {
@@ -113,14 +109,14 @@ describe("createMultipartStream", () => {
                 start(controller) {
                     controller.enqueue(textData);
                     controller.close();
-                }
+                },
             });
 
             const stream = boundedByteStreamParameter(readableStream, TEXT, textData.byteLength);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: textData.byteLength }] },
-                { type: "text", data: stream }
+                { type: "text", data: stream },
             ];
 
             const multipartStream = createMultipartStream(frames, "boundary");
@@ -137,14 +133,14 @@ describe("createMultipartStream", () => {
                 start(controller) {
                     controller.enqueue(binaryData);
                     controller.close();
-                }
+                },
             });
 
             const stream = boundedByteStreamParameter(readableStream, BINARY, binaryData.byteLength);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "binary", byteSize: binaryData.byteLength }] },
-                { type: "binary", data: stream }
+                { type: "binary", data: stream },
             ];
 
             const multipartStream = createMultipartStream(frames, "boundary");
@@ -157,9 +153,7 @@ describe("createMultipartStream", () => {
     describe("Error Handling", () => {
         it("should throw error for invalid frame type", async () => {
             // Create a frame with an invalid type
-            const frames: RequestFrame[] = [
-                { invalid: "frame" } as any
-            ];
+            const frames = [{ invalid: "frame" } as unknown] as RequestFrame[];
 
             const stream = createMultipartStream(frames, "boundary");
             const reader = stream.getReader();
@@ -174,10 +168,10 @@ describe("createMultipartStream", () => {
 
         it("should throw error for unsupported text parameter type", async () => {
             // Create a frame with an invalid data type (plain Uint8Array without format)
-            const frames: RequestFrame[] = [
+            const frames = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: 10 }] },
-                { type: "text", data: new Uint8Array([1, 2, 3]) as any }
-            ];
+                { type: "text", data: new Uint8Array([1, 2, 3]) as unknown },
+            ] as RequestFrame[];
 
             const stream = createMultipartStream(frames, "boundary");
             const reader = stream.getReader();
@@ -196,13 +190,13 @@ describe("createMultipartStream", () => {
                 start(controller) {
                     controller.enqueue(new Uint8Array([1, 2, 3]));
                     controller.close();
-                }
+                },
             });
 
-            const frames: RequestFrame[] = [
+            const frames = [
                 { query: "SELECT $1", parameters: [{ type: "binary", byteSize: 3 }] },
-                { type: "binary", data: plainStream as any }
-            ];
+                { type: "binary", data: plainStream as unknown },
+            ] as RequestFrame[];
 
             const stream = createMultipartStream(frames, "boundary");
             const reader = stream.getReader();
@@ -220,14 +214,14 @@ describe("createMultipartStream", () => {
             const errorStream = new ReadableStream({
                 start(controller) {
                     controller.error(new Error("Stream error"));
-                }
+                },
             });
 
             const stream = boundedByteStreamParameter(errorStream, TEXT, 10);
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: 10 }] },
-                { type: "text", data: stream }
+                { type: "text", data: stream },
             ];
 
             const multipartStream = createMultipartStream(frames, "boundary");
@@ -256,7 +250,7 @@ describe("createMultipartStream", () => {
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: textData.byteLength }] },
-                { type: "text", data: stream }
+                { type: "text", data: stream },
             ];
 
             const multipartStream = createMultipartStream(frames, "boundary");
@@ -287,12 +281,12 @@ describe("createMultipartStream", () => {
                     parameters: [
                         { type: "text", byteSize: text1.byteLength },
                         { type: "text", byteSize: text2.byteLength },
-                        { type: "binary", byteSize: binary.byteLength }
-                    ]
+                        { type: "binary", byteSize: binary.byteLength },
+                    ],
                 },
                 { type: "text", data: param1 },
                 { type: "text", data: param2 },
-                { type: "binary", data: param3 }
+                { type: "binary", data: param3 },
             ];
 
             const stream = createMultipartStream(frames, "boundary");
@@ -319,7 +313,7 @@ describe("createMultipartStream", () => {
                     controller.enqueue(chunk2);
                     controller.enqueue(chunk3);
                     controller.close();
-                }
+                },
             });
 
             const totalLength = chunk1.byteLength + chunk2.byteLength + chunk3.byteLength;
@@ -327,7 +321,7 @@ describe("createMultipartStream", () => {
 
             const frames: RequestFrame[] = [
                 { query: "SELECT $1", parameters: [{ type: "text", byteSize: totalLength }] },
-                { type: "text", data: stream }
+                { type: "text", data: stream },
             ];
 
             const multipartStream = createMultipartStream(frames, "boundary");

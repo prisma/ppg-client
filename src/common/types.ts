@@ -40,7 +40,8 @@ export type RawParameter = string | null | ByteArrayParameter | BoundedByteStrea
 
 /**
  * Extended async iterator that can collect remaining elements into an array.
- * Useful when you want to stream initially, then collect the rest.
+ * Useful when you want to stream initially, then collect the rest, or just
+ * collect all the items at once.
  */
 export interface CollectableIterator<T> extends AsyncIterableIterator<T> {
     /**

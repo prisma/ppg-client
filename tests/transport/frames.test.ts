@@ -1,6 +1,17 @@
-import { describe, it, expect } from "vitest";
-import { requestFrames, QueryDescriptorFrame, ExtendedParamFrame, InlineQueryParameter } from "../../src/transport/frames";
-import { boundedByteStreamParameter, byteArrayParameter, BINARY, TEXT } from "../../src/common/types";
+import { describe, expect, it } from "vitest";
+import {
+    BINARY,
+    type RawParameter,
+    TEXT,
+    boundedByteStreamParameter,
+    byteArrayParameter,
+} from "../../src/common/types.ts";
+import {
+    type ExtendedParamFrame,
+    type InlineQueryParameter,
+    type QueryDescriptorFrame,
+    requestFrames,
+} from "../../src/transport/frames.ts";
 
 describe("queryRequest", () => {
     describe("string parameters", () => {
@@ -153,7 +164,7 @@ describe("queryRequest", () => {
                 start(controller) {
                     controller.enqueue(data);
                     controller.close();
-                }
+                },
             });
             const boundedStream = boundedByteStreamParameter(stream, BINARY, data.byteLength);
 
@@ -174,7 +185,7 @@ describe("queryRequest", () => {
                 start(controller) {
                     controller.enqueue(data);
                     controller.close();
-                }
+                },
             });
             const boundedStream = boundedByteStreamParameter(stream, TEXT, data.byteLength);
 
@@ -194,7 +205,7 @@ describe("queryRequest", () => {
                 start(controller) {
                     controller.enqueue(largeData);
                     controller.close();
-                }
+                },
             });
             const boundedStream = boundedByteStreamParameter(stream, BINARY, largeData.byteLength);
 
@@ -220,7 +231,7 @@ describe("queryRequest", () => {
                 start(controller) {
                     controller.enqueue(data);
                     controller.close();
-                }
+                },
             });
             const boundedStream = boundedByteStreamParameter(stream, TEXT, data.byteLength);
 
@@ -247,7 +258,7 @@ describe("queryRequest", () => {
                     controller.enqueue(chunk1);
                     controller.enqueue(chunk2);
                     controller.close();
-                }
+                },
             });
             const boundedStream = boundedByteStreamParameter(stream, BINARY, 6);
 
@@ -271,7 +282,7 @@ describe("queryRequest", () => {
                     controller.enqueue(chunk1);
                     controller.enqueue(chunk2);
                     controller.close();
-                }
+                },
             });
             const boundedStream = boundedByteStreamParameter(stream, TEXT, chunk1.byteLength + chunk2.byteLength);
 
@@ -305,10 +316,7 @@ describe("queryRequest", () => {
             const binary = byteArrayParameter(new Uint8Array([1, 2, 3]), BINARY);
             const longString = "x".repeat(1500);
 
-            const frames = await requestFrames("query",
-                "SELECT $1, $2, $3",
-                [shortString, binary, longString]
-            );
+            const frames = await requestFrames("query", "SELECT $1, $2, $3", [shortString, binary, longString]);
 
             expect(frames).toHaveLength(2);
 
@@ -327,10 +335,7 @@ describe("queryRequest", () => {
             const long2 = "b".repeat(2000);
             const largeBinary = byteArrayParameter(new Uint8Array(1500), BINARY);
 
-            const frames = await requestFrames("query",
-                "SELECT $1, $2, $3",
-                [long1, long2, largeBinary]
-            );
+            const frames = await requestFrames("query", "SELECT $1, $2, $3", [long1, long2, largeBinary]);
 
             expect(frames).toHaveLength(4); // 1 descriptor + 3 extended params
 
@@ -360,24 +365,24 @@ describe("queryRequest", () => {
     describe("error handling", () => {
         it("should throw error for unsupported parameter types", async () => {
             // Test with number
-            await expect(
-                requestFrames("query", "SELECT $1", [123 as any])
-            ).rejects.toThrow("unsupported raw parameter type");
+            await expect(requestFrames("query", "SELECT $1", [123 as unknown] as RawParameter[])).rejects.toThrow(
+                "unsupported raw parameter type",
+            );
 
             // Test with boolean
-            await expect(
-                requestFrames("query", "SELECT $1", [true as any])
-            ).rejects.toThrow("unsupported raw parameter type");
+            await expect(requestFrames("query", "SELECT $1", [true as unknown] as RawParameter[])).rejects.toThrow(
+                "unsupported raw parameter type",
+            );
 
             // Test with object
             await expect(
-                requestFrames("query", "SELECT $1", [{ key: "value" } as any])
+                requestFrames("query", "SELECT $1", [{ key: "value" } as unknown] as RawParameter[]),
             ).rejects.toThrow("unsupported raw parameter type");
 
             // Test with array
-            await expect(
-                requestFrames("query", "SELECT $1", [[1, 2, 3] as any])
-            ).rejects.toThrow("unsupported raw parameter type");
+            await expect(requestFrames("query", "SELECT $1", [[1, 2, 3] as unknown] as RawParameter[])).rejects.toThrow(
+                "unsupported raw parameter type",
+            );
         });
     });
 
@@ -428,7 +433,10 @@ describe("queryRequest", () => {
 
     describe("exec kind", () => {
         it("should create exec frame for INSERT statements", async () => {
-            const frames = await requestFrames("exec", "INSERT INTO users (name, email) VALUES ($1, $2)", ["John Doe", "john@example.com"]);
+            const frames = await requestFrames("exec", "INSERT INTO users (name, email) VALUES ($1, $2)", [
+                "John Doe",
+                "john@example.com",
+            ]);
 
             expect(frames).toHaveLength(1);
             const descriptor = frames[0] as QueryDescriptorFrame;

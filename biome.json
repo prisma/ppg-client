@@ -8,7 +8,7 @@
     "files": {
         "ignoreUnknown": false,
         "ignore": ["dist"],
-        "include": ["src/api/*", "src/common/*", "src/transport/*", "test/**/*"]
+        "include": ["src/api/*", "src/common/*", "src/transport/*", "tests/**/*"]
     },
     "formatter": {
         "enabled": true,

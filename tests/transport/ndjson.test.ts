@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { parseNDJSONResponse } from "../../src/transport/ndjson";
+import { describe, expect, it } from "vitest";
+import { parseNDJSONResponse } from "../../src/transport/ndjson.ts";
 
 /**
  * Helper to create a mock Response with NDJSON stream
@@ -88,10 +88,7 @@ describe("parseNDJSONResponse", () => {
         });
 
         it("should handle empty result set (no data rows)", async () => {
-            const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","typeOid":23}]}',
-                '{"complete":true}',
-            ]);
+            const response = createNDJSONResponse(['{"columns":[{"name":"id","typeOid":23}]}', '{"complete":true}']);
 
             const result = await parseNDJSONResponse(response);
             const rows = await result.rows.collect();
@@ -129,7 +126,7 @@ describe("parseNDJSONResponse", () => {
 
             const result = await parseNDJSONResponse(response);
 
-            await expect(result.rows.collect()).rejects.toThrow('syntax error');
+            await expect(result.rows.collect()).rejects.toThrow("syntax error");
         });
 
         it("should silently ignore unsupported frame types", async () => {
@@ -280,10 +277,7 @@ describe("parseNDJSONResponse", () => {
         });
 
         it("should handle case where first result is done (no data rows)", async () => {
-            const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","typeOid":23}]}',
-                '{"complete":true}',
-            ]);
+            const response = createNDJSONResponse(['{"columns":[{"name":"id","typeOid":23}]}', '{"complete":true}']);
 
             const result = await parseNDJSONResponse(response);
             const rows = await result.rows.collect();

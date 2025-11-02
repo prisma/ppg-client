@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { CommandComplete, DataRow, DataRowDescription, ErrorFrame } from "../../src/transport/frames.ts";
 import { newQueryQueue } from "../../src/transport/query-queue.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
-import type { DataRowDescription, DataRow, CommandComplete, ErrorFrame } from "../../src/transport/frames.ts";
-import { nextTick } from "./websocket-test-utils.ts";
+import { runEventLoop } from "./websocket-test-utils.ts";
 
 describe("QueryQueue", () => {
     describe("isEmpty()", () => {
@@ -133,13 +133,13 @@ describe("QueryQueue", () => {
                 return rows;
             })();
 
-            await nextTick()
+            await runEventLoop();
 
             // Send one row successfully
             const row1: DataRow = { values: ["1"] };
             queue.processFrame(FRAME_URNS.dataRowUrn, row1);
 
-            await nextTick()
+            await runEventLoop();
 
             // Then error occurs
             const errorFrame: ErrorFrame = {
@@ -277,26 +277,26 @@ describe("QueryQueue", () => {
             const consumePromise = (async () => {
                 const response = await enqueued.promise;
                 // Get first row manually
-                await nextTick()
+                await runEventLoop();
                 const first = await response.rows.next();
 
-                await nextTick()
+                await runEventLoop();
                 // Collect the rest
                 const rest = await response.rows.collect();
 
                 return { first: first.value, rest };
             })();
 
-            await nextTick()
+            await runEventLoop();
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: ["1"] });
-            await nextTick()
+            await runEventLoop();
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: ["2"] });
-            await nextTick()
+            await runEventLoop();
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: ["3"] });
-            await nextTick()
+            await runEventLoop();
 
             queue.processFrame(FRAME_URNS.commandCompleteUrn, { complete: true });
 
@@ -317,10 +317,10 @@ describe("QueryQueue", () => {
 
             // All queries should be aborted due to protocol error
             await expect(query1.promise).rejects.toThrow(
-                "Protocol error: unexpected frame URN 'urn:invalid:frame' for current query state"
+                "Protocol error: unexpected frame URN 'urn:invalid:frame' for current query state",
             );
             await expect(query2.promise).rejects.toThrow(
-                "Protocol error: unexpected frame URN 'urn:invalid:frame' for current query state"
+                "Protocol error: unexpected frame URN 'urn:invalid:frame' for current query state",
             );
 
             expect(queue.isEmpty()).toBe(true);
@@ -351,10 +351,10 @@ describe("QueryQueue", () => {
                 return await response.rows.collect();
             })();
 
-            await nextTick()
+            await runEventLoop();
 
             queue.processFrame(FRAME_URNS.dataRowUrn, { values: [null] });
-            await nextTick()
+            await runEventLoop();
 
             queue.processFrame(FRAME_URNS.commandCompleteUrn, { complete: true });
 

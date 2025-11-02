@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { toCollectableIterator, boundedByteStreamParameter, isBoundedByteStreamParameter, BINARY } from "../../src/common/types";
+import { describe, expect, it } from "vitest";
+import {
+    BINARY,
+    boundedByteStreamParameter,
+    isBoundedByteStreamParameter,
+    toCollectableIterator,
+} from "../../src/common/types.ts";
 
 describe("CollectableIterator", () => {
     describe("Basic Iteration", () => {
@@ -22,24 +27,24 @@ describe("CollectableIterator", () => {
 
         it("should support manual next() calls", async () => {
             async function* generator() {
-                yield 'a';
-                yield 'b';
-                yield 'c';
+                yield "a";
+                yield "b";
+                yield "c";
             }
 
             const iter = toCollectableIterator(generator());
 
             const first = await iter.next();
             expect(first.done).toBe(false);
-            expect(first.value).toBe('a');
+            expect(first.value).toBe("a");
 
             const second = await iter.next();
             expect(second.done).toBe(false);
-            expect(second.value).toBe('b');
+            expect(second.value).toBe("b");
 
             const third = await iter.next();
             expect(third.done).toBe(false);
-            expect(third.value).toBe('c');
+            expect(third.value).toBe("c");
 
             const fourth = await iter.next();
             expect(fourth.done).toBe(true);
@@ -187,7 +192,7 @@ describe("CollectableIterator", () => {
                 },
                 [Symbol.asyncIterator]() {
                     return this;
-                }
+                },
             };
 
             const iter = toCollectableIterator(mockIterator);
@@ -233,7 +238,7 @@ describe("CollectableIterator", () => {
                 // No return() method defined
                 [Symbol.asyncIterator]() {
                     return this;
-                }
+                },
             };
 
             const iter = toCollectableIterator(mockIterator);
@@ -259,7 +264,7 @@ describe("CollectableIterator", () => {
             const iter = toCollectableIterator(generator());
 
             // Call throw and catch the error
-            await expect(iter.throw!(new Error('test error'))).rejects.toThrow('test error');
+            await expect(iter.throw!(new Error("test error"))).rejects.toThrow("test error");
 
             // Further iteration should return empty
             const next = await iter.next();
@@ -268,7 +273,7 @@ describe("CollectableIterator", () => {
 
         it("should call underlying iterator's throw() if it exists", async () => {
             let throwCalled = false;
-            let errorMessage = '';
+            let errorMessage = "";
 
             const mockIterator: AsyncIterableIterator<number> = {
                 async next() {
@@ -281,19 +286,19 @@ describe("CollectableIterator", () => {
                 },
                 [Symbol.asyncIterator]() {
                     return this;
-                }
+                },
             };
 
             const iter = toCollectableIterator(mockIterator);
 
             try {
-                await iter.throw!(new Error('custom error'));
+                await iter.throw!(new Error("custom error"));
             } catch {
                 // Expected
             }
 
             expect(throwCalled).toBe(true);
-            expect(errorMessage).toBe('custom error');
+            expect(errorMessage).toBe("custom error");
         });
 
         it("should prevent collect() from working after throw()", async () => {
@@ -305,7 +310,7 @@ describe("CollectableIterator", () => {
             const iter = toCollectableIterator(generator());
 
             try {
-                await iter.throw!(new Error('test'));
+                await iter.throw!(new Error("test"));
             } catch {
                 // Expected
             }
@@ -323,14 +328,14 @@ describe("CollectableIterator", () => {
                 // No throw() method defined
                 [Symbol.asyncIterator]() {
                     return this;
-                }
+                },
             };
 
             const iter = toCollectableIterator(mockIterator);
 
             // Should use the fallback: Promise.reject(error)
-            const testError = new Error('fallback test error');
-            await expect(iter.throw!(testError)).rejects.toThrow('fallback test error');
+            const testError = new Error("fallback test error");
+            await expect(iter.throw!(testError)).rejects.toThrow("fallback test error");
 
             // Iterator should be marked as collected
             const next = await iter.next();
@@ -420,7 +425,7 @@ describe("BoundedByteStream", () => {
                 start(controller) {
                     controller.enqueue(new Uint8Array([1, 2, 3]));
                     controller.close();
-                }
+                },
             });
 
             const bounded = boundedByteStreamParameter(stream, BINARY, 3);
@@ -435,7 +440,7 @@ describe("BoundedByteStream", () => {
                 start(controller) {
                     controller.enqueue(data);
                     controller.close();
-                }
+                },
             });
 
             const bounded = boundedByteStreamParameter(stream, BINARY, data.byteLength);

@@ -1,9 +1,9 @@
-import { expect, vi } from "vitest";
-import { QueryDescriptorFrame, ExtendedParamFrame, ResponseFrame } from "../../src/transport/frames";
-import { Readable } from "stream";
+import { Readable } from "node:stream";
 import Busboy from "busboy";
-import { BINARY, byteArrayParameter } from "../../src/common/types";
-import { utf8ByteLength } from "../../src/transport/shims";
+import { expect, vi } from "vitest";
+import { BINARY, byteArrayParameter } from "../../src/common/types.ts";
+import type { ExtendedParamFrame, QueryDescriptorFrame, ResponseFrame } from "../../src/transport/frames.ts";
+import { utf8ByteLength } from "../../src/transport/shims.ts";
 
 /**
  * Mock HTTP Server for testing the HTTP transport.
@@ -19,45 +19,43 @@ export class MockHttpServer {
      * Install the fetch mock
      */
     install(): void {
-        const self = this;
-
         global.fetch = vi.fn(async (url: string | URL, init?: RequestInit): Promise<Response> => {
             // Capture request details
-            self.receivedRequest = {
+            this.receivedRequest = {
                 url: url.toString(),
-                method: init?.method || 'GET',
-                headers: init?.headers as Record<string, string> || {},
+                method: init?.method || "GET",
+                headers: (init?.headers as Record<string, string>) || {},
                 body: init?.body,
             };
 
             // Parse multipart body
             if (init?.body) {
-                const contentType = (init.headers as Record<string, string>)?.['Content-Type'] || '';
+                const contentType = (init.headers as Record<string, string>)?.["Content-Type"] || "";
                 const boundaryMatch = contentType.match(/boundary=([^;]+)/);
                 if (boundaryMatch) {
                     const boundary = boundaryMatch[1];
-                    self.receivedFrames = await self.parseMultipartBody(init.body, boundary);
+                    this.receivedFrames = await this.parseMultipartBody(init.body, boundary);
                 }
             }
 
             // Verify expectations
-            self.checkExpectations();
+            this.checkExpectations();
 
             // Return mocked response
-            const ndjson = self.createNDJSONResponse(self.responseFrames);
+            const ndjson = this.createNDJSONResponse(this.responseFrames);
 
             // Convert Node.js Readable to Web ReadableStream
             const webStream = new ReadableStream({
                 start(controller) {
                     controller.enqueue(new TextEncoder().encode(ndjson));
                     controller.close();
-                }
+                },
             });
 
             return new Response(webStream, {
                 status: 200,
                 headers: {
-                    'Content-Type': 'application/x-ndjson',
+                    "Content-Type": "application/x-ndjson",
                 },
             });
         }) as typeof fetch;
@@ -75,7 +73,7 @@ export class MockHttpServer {
      */
     private async parseMultipartBody(
         body: BodyInit,
-        boundary: string
+        boundary: string,
     ): Promise<(QueryDescriptorFrame | ExtendedParamFrame)[]> {
         return new Promise((resolve, reject) => {
             const frames: (QueryDescriptorFrame | ExtendedParamFrame)[] = [];
@@ -88,14 +86,14 @@ export class MockHttpServer {
             } else if (body instanceof Uint8Array) {
                 stream = Readable.from(Buffer.from(body));
             } else {
-                reject(new Error('Unsupported body type for testing'));
+                reject(new Error("Unsupported body type for testing"));
                 return;
             }
 
             // Create busboy instance
             const busboy = Busboy({
                 headers: {
-                    'content-type': `multipart/form-data; boundary=${boundary}`,
+                    "content-type": `multipart/form-data; boundary=${boundary}`,
                 },
             });
 
@@ -106,70 +104,72 @@ export class MockHttpServer {
             // Helper function to process frame data
             const processFrame = (fieldname: string, data: string | Buffer, order: number) => {
                 switch (fieldname) {
-                    case 'urn:prisma:query:descriptor':
+                    case "urn:prisma:query:descriptor": {
                         // Query descriptor - parse as JSON
-                        const dataStr = typeof data === 'string' ? data : data.toString('utf-8');
+                        const dataStr = typeof data === "string" ? data : data.toString("utf-8");
                         const descriptor = JSON.parse(dataStr) as QueryDescriptorFrame;
                         pendingParts.push({ order, frame: descriptor });
                         break;
+                    }
 
-                    case 'urn:prisma:query:param:text':
+                    case "urn:prisma:query:param:text": {
                         // Text parameter
-                        const textData = typeof data === 'string' ? data : data.toString('utf-8');
+                        const textData = typeof data === "string" ? data : data.toString("utf-8");
                         pendingParts.push({
                             order,
                             frame: {
-                                type: 'text',
+                                type: "text",
                                 data: textData,
                             },
                         });
                         break;
+                    }
 
-                    case 'urn:prisma:query:param:binary':
+                    case "urn:prisma:query:param:binary": {
                         // Binary parameter
-                        const binaryData = typeof data === 'string'
-                            ? new TextEncoder().encode(data)
-                            : new Uint8Array(data);
+                        const binaryData =
+                            typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
                         pendingParts.push({
                             order,
                             frame: {
-                                type: 'binary',
+                                type: "binary",
                                 data: byteArrayParameter(binaryData, BINARY),
                             },
                         });
                         break;
+                    }
                 }
             };
 
             // Handle "field" events (busboy treats parts without filename as fields)
-            busboy.on('field', (fieldname, value) => {
+            busboy.on("field", (fieldname, value) => {
                 const currentIndex = partIndex++;
                 processFrame(fieldname, value, currentIndex);
             });
 
             // Handle "file" events (busboy may treat binary data as files)
-            busboy.on('file', (fieldname, file, _info) => {
+            busboy.on("file", (fieldname, file, _info) => {
                 const currentIndex = partIndex++;
                 const chunks: Buffer[] = [];
 
-                file.on('data', (chunk: Buffer) => {
+                file.on("data", (chunk: Buffer) => {
                     chunks.push(chunk);
                 });
 
-                file.on('end', () => {
+                file.on("end", () => {
                     const combined = Buffer.concat(chunks);
                     processFrame(fieldname, combined, currentIndex);
                 });
             });
 
-            busboy.on('finish', () => {
+            busboy.on("finish", () => {
                 // Sort by order and extract frames
                 pendingParts.sort((a, b) => a.order - b.order);
-                frames.push(...pendingParts.map(p => p.frame));
+                frames.push(...pendingParts.map((p) => p.frame));
                 resolve(frames);
             });
 
-            busboy.on('error', (err: Error) => {
+            busboy.on("error", (err: Error) => {
                 reject(err);
             });
 
@@ -198,7 +198,7 @@ export class MockHttpServer {
      * Create NDJSON response from frames
      */
     private createNDJSONResponse(frames: ResponseFrame[]): string {
-        return frames.map(frame => JSON.stringify(frame)).join('\n') + '\n';
+        return `${frames.map((frame) => JSON.stringify(frame)).join("\n")}\n`;
     }
 
     /**
@@ -223,13 +223,13 @@ export class MockHttpServer {
     private verifyFrame(
         expected: ExpectedFrame,
         received: QueryDescriptorFrame | ExtendedParamFrame,
-        index: number
+        index: number,
     ): void {
-        if (expected.type === 'query-descriptor') {
+        if (expected.type === "query-descriptor") {
             // Verify it's a query descriptor frame
             expect(
-                'query' in received || 'exec' in received,
-                `Frame ${index}: Expected query descriptor but got ${JSON.stringify(received)}`
+                "query" in received || "exec" in received,
+                `Frame ${index}: Expected query descriptor but got ${JSON.stringify(received)}`,
             ).toBe(true);
 
             const descriptor = received as QueryDescriptorFrame;
@@ -237,13 +237,15 @@ export class MockHttpServer {
 
             // Verify kind (query vs exec)
             if (expectations.kind !== undefined) {
-                expect(expectations.kind in descriptor, `Frame ${index}: Expected '${expectations.kind}' kind but got '${Object.keys(descriptor).join()}'`).toBe(true);
+                expect(
+                    expectations.kind in descriptor,
+                    `Frame ${index}: Expected '${expectations.kind}' kind but got '${Object.keys(descriptor).join()}'`,
+                ).toBe(true);
             }
-
 
             // Verify SQL
             if (expectations.sql !== undefined) {
-                const sql = 'query' in descriptor ? descriptor.query : descriptor.exec;
+                const sql = "query" in descriptor ? descriptor.query : descriptor.exec;
                 expect(sql, `Frame ${index}: SQL mismatch`).toBe(expectations.sql);
             }
 
@@ -252,32 +254,30 @@ export class MockHttpServer {
                 const actualCount = descriptor.parameters?.length || 0;
                 expect(actualCount, `Frame ${index}: Parameter count mismatch`).toBe(expectations.parameterCount);
             }
-        } else if (expected.type === 'text-param') {
+        } else if (expected.type === "text-param") {
             // Verify it's a text parameter frame
             expect(
-                'type' in received && received.type === 'text',
-                `Frame ${index}: Expected text param but got ${JSON.stringify(received)}`
+                "type" in received && received.type === "text",
+                `Frame ${index}: Expected text param but got ${JSON.stringify(received)}`,
             ).toBe(true);
 
             const textParam = received as ExtendedParamFrame;
 
             // Verify content
-            if (typeof expected.expectations === 'string') {
+            if (typeof expected.expectations === "string") {
                 const data = textParam.data;
-                const actualText = typeof data === 'string' ? data : new TextDecoder().decode(data as Uint8Array);
+                const actualText = typeof data === "string" ? data : new TextDecoder().decode(data as Uint8Array);
                 expect(actualText, `Frame ${index}: Text content mismatch`).toBe(expected.expectations);
             } else if (expected.expectations?.byteSize !== undefined) {
                 const data = textParam.data;
-                const actualSize = typeof data === 'string'
-                    ? utf8ByteLength(data)
-                    : (data as Uint8Array).length;
+                const actualSize = typeof data === "string" ? utf8ByteLength(data) : (data as Uint8Array).length;
                 expect(actualSize, `Frame ${index}: Byte size mismatch`).toBe(expected.expectations.byteSize);
             }
-        } else if (expected.type === 'binary-param') {
+        } else if (expected.type === "binary-param") {
             // Verify it's a binary parameter frame
             expect(
-                'type' in received && received.type === 'binary',
-                `Frame ${index}: Expected binary param but got ${JSON.stringify(received)}`
+                "type" in received && received.type === "binary",
+                `Frame ${index}: Expected binary param but got ${JSON.stringify(received)}`,
             ).toBe(true);
 
             const binaryParam = received as ExtendedParamFrame;
@@ -299,12 +299,12 @@ export class MockHttpServer {
      * Expect a query descriptor frame with specific properties
      */
     expectQueryDescriptor(expectations: {
-        kind?: 'query' | 'exec';
+        kind?: "query" | "exec";
         sql?: string;
         parameterCount?: number;
     }): this {
         this.expectedFrames.push({
-            type: 'query-descriptor',
+            type: "query-descriptor",
             expectations,
         });
         return this;
@@ -315,7 +315,7 @@ export class MockHttpServer {
      */
     expectTextParam(expectedContent?: string | { byteSize: number }): this {
         this.expectedFrames.push({
-            type: 'text-param',
+            type: "text-param",
             expectations: expectedContent,
         });
         return this;
@@ -326,7 +326,7 @@ export class MockHttpServer {
      */
     expectBinaryParam(expectedContent?: Uint8Array | { byteSize: number }): this {
         this.expectedFrames.push({
-            type: 'binary-param',
+            type: "binary-param",
             expectations: expectedContent,
         });
         return this;
@@ -365,12 +365,12 @@ export class MockHttpServer {
     /**
      * Configure response: send error
      */
-    respondWithError(error: { message: string; code?: string;[key: string]: string | undefined }): this {
+    respondWithError(error: { message: string; code?: string; [key: string]: string | undefined }): this {
         const { message, code, ...rest } = error;
         this.responseFrames.push({
             error: {
                 message,
-                code: code || 'ERROR',
+                code: code || "ERROR",
                 ...rest,
             },
         });
@@ -381,13 +381,13 @@ export class MockHttpServer {
      * Verify authentication header
      */
     verifyAuth(username: string, password: string): void {
-        expect(this.receivedRequest, 'No request received').toBeDefined();
+        expect(this.receivedRequest, "No request received").toBeDefined();
 
-        const authHeader = this.receivedRequest!.headers['Authorization'];
-        expect(authHeader, 'No Authorization header found').toBeDefined();
+        const authHeader = this.receivedRequest!.headers.Authorization;
+        expect(authHeader, "No Authorization header found").toBeDefined();
 
         const expected = `Basic ${btoa(`${username}:${password}`)}`;
-        expect(authHeader, 'Auth header mismatch').toBe(expected);
+        expect(authHeader, "Auth header mismatch").toBe(expected);
     }
 
     /**
@@ -415,24 +415,23 @@ export class MockHttpServer {
     }
 }
 
-
 export type ExpectedFrame =
     | {
-        type: 'query-descriptor';
-        expectations: {
-            kind?: 'query' | 'exec';
-            sql?: string;
-            parameterCount?: number;
-        };
-    }
+          type: "query-descriptor";
+          expectations: {
+              kind?: "query" | "exec";
+              sql?: string;
+              parameterCount?: number;
+          };
+      }
     | {
-        type: 'text-param';
-        expectations?: string | { byteSize: number };
-    }
+          type: "text-param";
+          expectations?: string | { byteSize: number };
+      }
     | {
-        type: 'binary-param';
-        expectations?: Uint8Array | { byteSize: number };
-    };
+          type: "binary-param";
+          expectations?: Uint8Array | { byteSize: number };
+      };
 
 export type ReceivedRequest = {
     url: string;
