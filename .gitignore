@@ -3,3 +3,4 @@
 /coverage
 .envrc.local
 .local.*
+*.bak
