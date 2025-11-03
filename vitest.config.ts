@@ -14,9 +14,11 @@ export default defineConfig({
         "node_modules/**",
         "dist/**",
         "coverage/**",
+        "tests/**",
         "**/*.config.{js,ts}",
         "**/*.d.ts",
         "**/example.ts",
+        "**/transport/shims.ts",
       ],
       // Coverage thresholds
       thresholds: {

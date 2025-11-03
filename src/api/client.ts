@@ -2,13 +2,12 @@
  * Prisma Postgres low-level Serverless Client API Module.
  */
 
-import type { RawParameter } from "../common/types.ts";
-
-/**
- * Creates a new client.
- * @param config Client configuration.
- */
-export declare function client(config: ClientConfig): Client;
+import type { CollectableIterator, RawParameter } from "../common/types.ts";
+import { toCollectableIterator } from "../common/types.ts";
+import type { NullableString } from "../transport/frames.ts";
+import { httpTransport } from "../transport/http.ts";
+import type { BaseTransport, Column, TransportConfig } from "../transport/shared.ts";
+import { webSocketTransport } from "../transport/websocket.ts";
 
 /**
  * Base configuration shared between Client and Session configurations.
@@ -18,7 +17,7 @@ interface BaseConfig {
      * Custom value parsers for specific PostgreSQL type OIDs.
      * These override the default parsing behavior for their respective types.
      */
-    parsers?: ValueParser[];
+    parsers?: ValueParser<unknown>[];
 
     /**
      * Custom value serializers for specific JavaScript types.
@@ -47,7 +46,7 @@ export interface SessionConfig extends BaseConfig {}
  * A mixin interface allowing single query execution.
  * Implemented by both Client and Session.
  */
-export interface Queryable {
+export interface Statements {
     /**
      * Executes a SQL query and returns the full result set with streaming rows.
      * Use this for SELECT queries or commands where you need to access result data.
@@ -86,7 +85,7 @@ export interface Queryable {
  * running individual raw queries or long running Sessions, which
  * can be used to implement interactive transactions.
  */
-export interface Client extends Queryable {
+export interface Client extends Statements {
     /**
      * Creates a new Session to run multiple queries interactively.
      * Sessions are useful for running transactions or maintaining state across queries.
@@ -98,14 +97,14 @@ export interface Client extends Queryable {
      * @returns A new Session instance
      *
      * ```ts
-     * const session = client.newSession();
+     * using session = await client.newSession();
      * await session.query("BEGIN");
      * await session.query("INSERT INTO users VALUES ($1, $2)", "Alice", 25);
      * await session.query("COMMIT");
      * await session.close();
      * ```
      */
-    newSession(config?: SessionConfig): Session;
+    newSession(config?: SessionConfig): Promise<Session>;
 }
 
 /**
@@ -113,14 +112,16 @@ export interface Client extends Queryable {
  * database. Multiple queries can be run while the Session is active.
  * The main use for Session is to run interactive transactions.
  */
-export interface Session extends Queryable, AsyncDisposable {
+export interface Session extends Statements, Disposable {
     /**
      * Gracefully closes the current Session. Please notice
-     * this will not run any implicit transaction command.
+     * This will not run any implicit transaction command: the database
+     * will automatically rollback any pending transaction when
+     * closing without commit.
      *
-     * This is an alias for [Symbol.asyncDispose]()
+     * This is an alias for [Symbol.dispose]()
      */
-    close(): Promise<void>;
+    close(): void;
 
     /**
      * If true, the Session can still accept new queries. If false,
@@ -135,8 +136,8 @@ export interface Session extends Queryable, AsyncDisposable {
  *
  * - `string`: Text data
  * - `null`: SQL NULL value
- * - `Uint8Array`: Binary data
- * - `ReadableStream<Uint8Array>`: Streamed binary data
+ * - `ByteArrayParameter`: Fixed size byte array, carrying text or binary data
+ * - `BoundedByteStreamParameter`: Streamed text or binary data, with a predetermined length
  */
 export type QueryParameter = RawParameter;
 
@@ -166,52 +167,7 @@ export interface Resultset {
      * const allRows = await result.rows.collect();
      * ```
      */
-    rows: ResultsetIterator<Row>;
-}
-
-/**
- * Extended async iterator that can collect remaining elements into an array.
- * Useful when you want to stream initially, then collect the rest.
- */
-export interface ResultsetIterator<T> extends AsyncIterableIterator<T> {
-    /**
-     * Collects the remaining (not yet consumed from the iterator) elements into an array.
-     * Once called, further iteration will be empty.
-     *
-     * ```ts
-     * const result = await client.query("SELECT * FROM users");
-     * // Process first row manually
-     * const { value: firstRow } = await result.rows.next();
-     * // Collect the rest
-     * const remainingRows = await result.rows.collect();
-     * ```
-     */
-    collect(): Promise<T[]>;
-}
-
-/**
- * Resultset column descriptor.
- */
-export interface Column {
-    /**
-     * Name of the column.
-     */
-    name: string;
-
-    /**
-     * Object identifier of the column type.
-     *
-     * If you need to know the column type name, you can use the `oid` to query
-     * the `pg_type` catalog:
-     *
-     * ```ts
-     * await client.run({
-     *   sql: `SELECT typname FROM pg_type WHERE oid = $1`,
-     *   parameters: [column.oid],
-     * });
-     * ```
-     */
-    oid: number;
+    rows: CollectableIterator<Row>;
 }
 
 /**
@@ -234,11 +190,11 @@ export interface Row {
  * A default set of parsers is provided for standard PostgreSQL types,
  * but these can be overridden by providing custom parsers in the client configuration.
  */
-export interface ValueParser {
+export interface ValueParser<T> {
     /**
      * PostgreSQL type OID that this parser handles.
      */
-    readonly typeOid: number;
+    readonly oid: number;
 
     /**
      * Parses the raw string value from PostgreSQL into a JavaScript value.
@@ -246,7 +202,7 @@ export interface ValueParser {
      * @param value - Raw string value from PostgreSQL, or null
      * @returns Parsed JavaScript value
      */
-    parse<T>(value: string | null): T;
+    parse(value: string | null): T;
 }
 
 /**
@@ -275,4 +231,235 @@ export interface ValueSerializer<T> {
      * @returns Serialized query parameter
      */
     serialize(value: T): QueryParameter;
+}
+
+/**
+ * Parses a standard PostgreSQL connection string into TransportConfig.
+ * Expects format: postgres://username:password@hostname:port/database
+ */
+function parseConnectionString(connectionString: string): TransportConfig {
+    const url = new URL(connectionString);
+
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
+        throw new Error(`Invalid connection string protocol: ${url.protocol}. Expected "postgres:" or "postgresql:"`);
+    }
+
+    const username = url.username;
+    const password = url.password;
+    const hostname = url.hostname;
+    const database = url.pathname.slice(1) || undefined; // Remove leading '/'
+
+    if (!username || !password) {
+        throw new Error("Connection string must include username and password");
+    }
+
+    const endpoint = `https://${hostname}`;
+
+    return {
+        endpoint,
+        username,
+        password,
+        database,
+    };
+}
+
+const passThrough = <T>(v: T) => v;
+type NonNullParse = (value: string) => unknown;
+const nullPassThrough =
+    <T>(fn: NonNullParse) =>
+    (v: string | null) =>
+        v === null ? null : fn(v);
+
+/**
+ * Default value parsers for common PostgreSQL types.
+ */
+const DEFAULT_PARSERS: ValueParser<unknown>[] = [
+    // Boolean
+    { oid: 16, parse: (value) => value === "t" },
+    // Int2 (smallint)
+    { oid: 21, parse: nullPassThrough((value) => Number.parseInt(value, 10)) },
+    // Int4 (integer)
+    { oid: 23, parse: nullPassThrough((value) => Number.parseInt(value, 10)) },
+    // Int8 (bigint) - parse as BigInt to preserve precision
+    { oid: 20, parse: nullPassThrough(BigInt) },
+    // Float4 (real)
+    { oid: 700, parse: nullPassThrough((value) => Number.parseFloat(value)) },
+    // Float8 (double precision)
+    { oid: 701, parse: nullPassThrough((value) => Number.parseFloat(value)) },
+    // Text
+    { oid: 25, parse: passThrough },
+    // Varchar
+    { oid: 1043, parse: passThrough },
+    // JSON
+    { oid: 114, parse: nullPassThrough((value) => JSON.parse(value)) },
+    // JSONB
+    { oid: 3802, parse: nullPassThrough((value) => JSON.parse(value)) },
+];
+
+const serializeToString = (x: NonNullable<unknown>) => x.toString();
+
+/**
+ * Default value serializers for common JavaScript types.
+ */
+const DEFAULT_SERIALIZERS: ValueSerializer<unknown>[] = [
+    // Date serializer
+    {
+        supports: (value): value is Date => value instanceof Date,
+        serialize: (value: Date) => value.toISOString(),
+    },
+    // BigInt serializer
+    {
+        supports: (value): value is bigint => typeof value === "bigint",
+        serialize: serializeToString,
+    },
+    // Boolean serializer
+    {
+        supports: (value): value is boolean => typeof value === "boolean",
+        serialize: (value: boolean) => (value ? "t" : "f"),
+    },
+    // Number serializer
+    {
+        supports: (value): value is number => typeof value === "number",
+        serialize: serializeToString,
+    },
+];
+
+/**
+ * Creates a new {@link Client}.
+ * @param config Client configuration ({@link ClientConfig}).
+ */
+export function client(config: ClientConfig): Client {
+    const transportConfig =
+        "transportConfig" in config
+            ? (config.transportConfig as TransportConfig)
+            : // override the config for testing
+              parseConnectionString(config.connectionString);
+
+    // Merge parsers: user parsers override defaults
+    const parsersMap = [...DEFAULT_PARSERS, ...(config.parsers || [])].reduce(
+        (map, parser) => map.set(parser.oid, parser),
+        new Map<number, ValueParser<unknown>>(),
+    );
+    const parsers = [...parsersMap.values()];
+
+    // Merge serializers: user serializers take precedence
+    const serializers = [...(config.serializers || []), ...DEFAULT_SERIALIZERS];
+
+    const transport = httpTransport(transportConfig);
+
+    // Create client statements methods
+    const statements = createStatements(transport, serializers, parsers);
+
+    async function newSession(sessionConfig?: SessionConfig): Promise<Session> {
+        const sessionTransport = webSocketTransport(transportConfig);
+        await sessionTransport.connect();
+
+        // Merge session-specific parsers/serializers with client defaults
+        const sessionParsersMap =
+            sessionConfig?.parsers?.reduce((map, parser) => map.set(parser.oid, parser), new Map(parsersMap)) ??
+            new Map(parsersMap);
+        const sessionParsers = [...sessionParsersMap.values()];
+
+        const sessionSerializers = [
+            ...(sessionConfig?.serializers || []),
+            ...(config.serializers || []),
+            ...DEFAULT_SERIALIZERS,
+        ];
+
+        // Create session statements methods
+        const sessionStatements = createStatements(sessionTransport, sessionSerializers, sessionParsers);
+
+        const session: Session = {
+            ...sessionStatements,
+            close() {
+                sessionTransport.close();
+            },
+
+            get active() {
+                return sessionTransport.isConnected();
+            },
+
+            [Symbol.dispose]() {
+                this.close();
+            },
+        };
+
+        return session;
+    }
+
+    return {
+        ...statements,
+        newSession,
+    };
+}
+
+// Helper to create query/exec methods with the given serializers and parsers
+function createStatements(
+    transport: BaseTransport,
+    serializers: ValueSerializer<unknown>[],
+    parsers: ValueParser<unknown>[],
+): Statements {
+    function transformResponse(response: {
+        columns: Column[];
+        rows: CollectableIterator<(string | null)[]>;
+    }): Resultset {
+        const columns: Column[] = response.columns.map((col: Column) => ({
+            name: col.name,
+            oid: col.oid,
+        }));
+
+        const rows = toCollectableIterator(response.rows, (rawRow) => parseSessionRow(parsers, columns, rawRow));
+
+        return { columns, rows };
+    }
+
+    return {
+        async query(sql: string, ...params: unknown[]): Promise<Resultset> {
+            const rawParams = serializeSessionParams(serializers, params);
+            const response = await transport.statement("query", sql, rawParams);
+            return transformResponse(response);
+        },
+
+        async exec(sql: string, ...params: unknown[]): Promise<number> {
+            const rawParams = serializeSessionParams(serializers, params);
+            const response = await transport.statement("exec", sql, rawParams);
+
+            // the first row always has 1 column being the count of rows affected
+            const firstRow = await response.rows.next();
+            // sanity check. Should not be needed, but better to verify for protocol consistence.
+            assertRowAffectedResult(firstRow);
+
+            return Number.parseInt(firstRow.value[0], 10);
+        },
+    };
+}
+
+function serializeSessionParams(serializers: ValueSerializer<unknown>[], params: unknown[]): RawParameter[] {
+    return params.map((param) => {
+        if (param === null || param === undefined) {
+            return null;
+        }
+
+        // Try custom serializers first, then default to string conversion
+        const serializer = serializers.find((s) => s.supports(param));
+        return serializer ? serializer.serialize(param) : typeof param === "string" ? param : String(param);
+    });
+}
+
+function parseSessionRow(parsers: ValueParser<unknown>[], columns: Column[], rawValues: NullableString[]): Row {
+    const values = rawValues.map((value, index) => {
+        const columnOid = columns[index].oid;
+        const parser = parsers.find((p) => p.oid === columnOid);
+        return parser ? parser.parse(value) : value;
+    });
+
+    return { values };
+}
+
+function assertRowAffectedResult(
+    x: IteratorResult<(string | null)[], unknown> | undefined,
+): asserts x is { done: false; value: [string] } {
+    if (!x || x.done || x.value?.length !== 1 || !x.value[0] || !/^\d+$/.test(x.value[0])) {
+        throw new Error(`Protocol error: missing rowsAffected value in exec response: ${JSON.stringify(x)}`);
+    }
 }

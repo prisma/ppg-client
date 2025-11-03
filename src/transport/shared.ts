@@ -1,3 +1,6 @@
+import type { CollectableIterator, RawParameter } from "../common/types.ts";
+import type { StatementKind } from "./frames.ts";
+
 export type FrameUrn = (typeof FRAME_URNS)[keyof typeof FRAME_URNS];
 export const FRAME_URNS = {
     queryUrn: "urn:prisma:query",
@@ -20,9 +23,44 @@ export const MIME_TYPES = {
     textPlain: "text/plain",
 } as const;
 
-export interface HttpTransportConfig {
+export interface TransportConfig {
     endpoint: string;
     username: string;
     password: string;
     database?: string;
+    keepalive?: boolean;
+}
+
+export interface StatementResponse {
+    readonly columns: Column[];
+    readonly rows: CollectableIterator<(string | null)[]>;
+}
+
+export interface BaseTransport {
+    statement(kind: StatementKind, sql: string, parameters: RawParameter[]): Promise<StatementResponse>;
+}
+
+/**
+ * Resultset column descriptor.
+ */
+export interface Column {
+    /**
+     * Name of the column.
+     */
+    name: string;
+
+    /**
+     * Object identifier of the column type.
+     *
+     * If you need to know the column type name, you can use the `oid` to query
+     * the `pg_type` catalog:
+     *
+     * ```ts
+     * await client.run({
+     *   sql: `SELECT typname FROM pg_type WHERE oid = $1`,
+     *   parameters: [column.oid],
+     * });
+     * ```
+     */
+    oid: number;
 }
