@@ -40,7 +40,7 @@ export interface ClientConfig extends BaseConfig {
  * Configuration for a database Session.
  * Allows per-session customization of parsing and serialization behavior.
  */
-export interface SessionConfig extends BaseConfig { }
+export interface SessionConfig extends BaseConfig {}
 
 /**
  * A mixin interface allowing single query execution.
@@ -170,8 +170,6 @@ export interface Resultset {
     rows: CollectableIterator<Row>;
 }
 
-
-
 /**
  * Single data row in a result set.
  */
@@ -268,8 +266,11 @@ function parseConnectionString(connectionString: string): TransportConfig {
 }
 
 const passThrough = <T>(v: T) => v;
-type NonNullParse = (value: string) => unknown
-const nullPassThrough = <T>(fn: NonNullParse) => (v: string | null) => v === null ? null : fn(v);
+type NonNullParse = (value: string) => unknown;
+const nullPassThrough =
+    <T>(fn: NonNullParse) =>
+    (v: string | null) =>
+        v === null ? null : fn(v);
 
 /**
  * Default value parsers for common PostgreSQL types.
@@ -278,23 +279,23 @@ const DEFAULT_PARSERS: ValueParser<unknown>[] = [
     // Boolean
     { oid: 16, parse: (value) => value === "t" },
     // Int2 (smallint)
-    { oid: 21, parse: nullPassThrough(value => Number.parseInt(value, 10)) },
+    { oid: 21, parse: nullPassThrough((value) => Number.parseInt(value, 10)) },
     // Int4 (integer)
-    { oid: 23, parse: nullPassThrough(value => Number.parseInt(value, 10)) },
+    { oid: 23, parse: nullPassThrough((value) => Number.parseInt(value, 10)) },
     // Int8 (bigint) - parse as BigInt to preserve precision
-    { oid: 20, parse: nullPassThrough(value => BigInt(value)) },
+    { oid: 20, parse: nullPassThrough(BigInt) },
     // Float4 (real)
-    { oid: 700, parse: nullPassThrough(value => Number.parseFloat(value)) },
+    { oid: 700, parse: nullPassThrough((value) => Number.parseFloat(value)) },
     // Float8 (double precision)
-    { oid: 701, parse: nullPassThrough(value => Number.parseFloat(value)) },
+    { oid: 701, parse: nullPassThrough((value) => Number.parseFloat(value)) },
     // Text
     { oid: 25, parse: passThrough },
     // Varchar
     { oid: 1043, parse: passThrough },
     // JSON
-    { oid: 114, parse: nullPassThrough(value => JSON.parse(value)) },
+    { oid: 114, parse: nullPassThrough((value) => JSON.parse(value)) },
     // JSONB
-    { oid: 3802, parse: nullPassThrough(value => JSON.parse(value)) },
+    { oid: 3802, parse: nullPassThrough((value) => JSON.parse(value)) },
 ];
 
 const serializeToString = (x: NonNullable<unknown>) => x.toString();
@@ -348,7 +349,6 @@ export function client(config: ClientConfig): Client {
     const statements = createStatements(transport, serializers, parsers);
 
     async function newSession(sessionConfig?: SessionConfig): Promise<Session> {
-
         const sessionTransport = webSocketTransport(transportConfig);
         await sessionTransport.connect();
 
@@ -444,11 +444,7 @@ function serializeSessionParams(serializers: ValueSerializer<unknown>[], params:
     });
 }
 
-function parseSessionRow(
-    parsers: ValueParser<unknown>[],
-    columns: Column[],
-    rawValues: NullableString[],
-): Row {
+function parseSessionRow(parsers: ValueParser<unknown>[], columns: Column[], rawValues: NullableString[]): Row {
     const values = rawValues.map((value, index) => {
         const columnOid = columns[index].oid;
         const parser = parsers.find((p) => p.oid === columnOid);

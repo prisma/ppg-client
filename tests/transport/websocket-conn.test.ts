@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { WebSocketError } from "../../src/common/types.ts";
 import type { TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
 import type { WsTransportConnection } from "../../src/transport/websocket-conn.ts";
@@ -232,7 +233,7 @@ describe("wsTransportConnection", () => {
                 onerror({ type: "error" } as Event);
             }
 
-            await expect(query.promise).rejects.toThrow("WebSocket error");
+            await expect(query.promise).rejects.toThrow(new WebSocketError({ message: "WebSocket error" }));
         });
 
         it("should handle error frame from server", async () => {
@@ -266,8 +267,20 @@ describe("wsTransportConnection", () => {
 
             getMockWs().simulateClose(1006, "Abnormal closure");
 
-            await expect(query1.promise).rejects.toThrow("WebSocket connection closed: 1006 - Abnormal closure");
-            await expect(query2.promise).rejects.toThrow("WebSocket connection closed: 1006 - Abnormal closure");
+            await expect(query1.promise).rejects.toThrow(
+                new WebSocketError({
+                    message: "WebSocket connection closed",
+                    closureCode: 1006,
+                    closureReason: "Abnormal closure",
+                }),
+            );
+            await expect(query2.promise).rejects.toThrow(
+                new WebSocketError({
+                    message: "WebSocket connection closed",
+                    closureCode: 1006,
+                    closureReason: "Abnormal closure",
+                }),
+            );
         });
 
         it("should close connection with normal closure code", async () => {

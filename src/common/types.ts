@@ -137,19 +137,74 @@ export function toCollectableIterator<TSource, TResult = TSource>(
     return collectableIterator;
 }
 
+/**
+ * Marker base error class
+ */
+export class GenericError extends Error {
+    constructor(msg: string, opts?: ErrorOptions) {
+        super(msg, opts);
+        this.name = new.target.name;
+    }
+}
 
+export class ValidationError extends GenericError {
+    constructor(msg: string, opts?: ErrorOptions) {
+        super(msg, opts);
+        this.name = new.target.name;
+    }
+}
 
-export class DatabaseError extends Error {
+interface HttpRequestErrorDetails {
+    readonly statusCode: number;
+    readonly message: string;
+}
+export class HttpResponseError extends GenericError {
+    public readonly status: number;
+    constructor({ message, statusCode }: HttpRequestErrorDetails, opts?: ErrorOptions) {
+        super(message, opts);
+        this.name = new.target.name;
+        this.status = statusCode;
+    }
+}
+
+interface WebSocketErrorDetails {
+    readonly closureCode?: number;
+    readonly closureReason?: string;
+    readonly message: string;
+}
+
+export class WebSocketError extends GenericError {
+    public readonly closureCode?: number;
+    public readonly closureReason?: string;
+    constructor({ message, closureCode, closureReason }: WebSocketErrorDetails, opts?: ErrorOptions) {
+        super(`${message}${closureStr(closureCode, closureReason)}`, opts);
+        this.name = new.target.name;
+        this.closureCode = closureCode;
+        this.closureReason = closureReason;
+    }
+}
+
+function closureStr(closureCode: number | undefined, closureReason: string | undefined) {
+    return !closureCode && !closureReason ? "" : ` (${closureCode} : ${closureReason})`;
+}
+
+export interface DatabaseErrorDetails {
+    readonly message: string;
+    readonly code: string;
+    readonly [key: string]: string;
+}
+
+export class DatabaseError extends GenericError {
     readonly code: string;
     readonly details: Record<string, string>;
-    constructor(message: string, code: string, details: Record<string, string>) {
-        super(message);
-        this.code = code;
-        this.details = details;
+    constructor(details: DatabaseErrorDetails, opts?: ErrorOptions) {
+        super(details.message, opts);
+        this.code = details.code;
+        this.details = { ...details };
         // biome-ignore lint:
-        delete details.code;
+        delete this.details.code;
         // biome-ignore lint:
-        delete details.message;
+        delete this.details.message;
         this.name = new.target.name;
     }
 }

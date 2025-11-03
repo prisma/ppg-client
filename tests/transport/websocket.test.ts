@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { WebSocketError } from "../../src/common/types.ts";
 import type { RequestFrame } from "../../src/transport/frames.ts";
 import type { Column, TransportConfig } from "../../src/transport/shared.ts";
 import { FRAME_URNS } from "../../src/transport/shared.ts";
@@ -316,7 +317,13 @@ describe("WebSocketTransport", () => {
             // Simulate connection close
             getMockWs().simulateClose(1006, "Connection lost");
 
-            await expect(queryPromise).rejects.toThrow("WebSocket connection closed: 1006 - Connection lost");
+            await expect(queryPromise).rejects.toThrow(
+                new WebSocketError({
+                    message: "WebSocket connection closed",
+                    closureCode: 1006,
+                    closureReason: "Connection lost",
+                }),
+            );
         });
 
         it("should reject ExtendedParamFrame with unsupported data type", async () => {

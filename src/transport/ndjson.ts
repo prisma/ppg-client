@@ -1,4 +1,3 @@
-
 import { DatabaseError, toCollectableIterator } from "../common/types.ts";
 import { isCommandComplete, isDataRow, isDataRowDescription, isErrorFrame } from "./frames.ts";
 import type { Column, StatementResponse } from "./shared.ts";
@@ -54,7 +53,7 @@ export async function parseNDJSONResponse(response: Response): Promise<Statement
                         // CommandComplete - end of results
                         return;
                     } else if (isErrorFrame(frame)) {
-                        throw new DatabaseError(frame.error.message, frame.error.code, frame.error);
+                        throw new DatabaseError(frame.error);
                     }
                 }
 

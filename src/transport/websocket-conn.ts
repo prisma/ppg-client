@@ -1,3 +1,4 @@
+import { WebSocketError } from "../common/types.ts";
 import type { WebSocketAuthFrame } from "./frames.ts";
 import { type EnqueuedQuery, newQueryQueue } from "./query-queue.ts";
 import type { TransportConfig } from "./shared.ts";
@@ -77,7 +78,7 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
     ws.onerror = (event) => {
         // Extract error message from event if available
         const errorMsg = "message" in event ? String(event.message) : "WebSocket error";
-        const error = new Error(errorMsg);
+        const error = new WebSocketError({ message: errorMsg });
 
         authDeferred.reject(error);
         queryQueue.abortAll(error);
@@ -86,12 +87,16 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
     // Handle connection close
     ws.onclose = (event) => {
         authDeferred.resolve(conn);
-        const closeError = new Error(`WebSocket connection closed: ${event.code} - ${event.reason}`);
+        const err = new WebSocketError({
+            message: "WebSocket connection closed",
+            closureCode: event.code,
+            closureReason: event.reason,
+        });
 
         if (queryQueue.isEmpty()) {
-            authDeferred.reject(closeError);
+            authDeferred.reject(err);
         } else {
-            queryQueue.abortAll(closeError);
+            queryQueue.abortAll(err);
         }
     };
 

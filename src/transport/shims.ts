@@ -1,3 +1,5 @@
+import { GenericError } from "../common/types.ts";
+
 /**
  * A deferred promise that exposes its resolve and reject functions.
  * Uses Promise.withResolvers() when available (ES2024+).
@@ -53,8 +55,9 @@ export async function createWebSocket(url: string | URL, protocols?: string | st
         const WebSocketImpl = WS.WebSocket || WS.default;
         return new WebSocketImpl(url, protocols) as unknown as WebSocket;
     } catch (error) {
-        throw new Error(
+        throw new GenericError(
             'WebSocket is not available. For Node.js < 21, please install the "ws" package: npm install ws',
+            { cause: error },
         );
     }
 }

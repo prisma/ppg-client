@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { client } from "../../src/api/client.ts";
+import { toCollectableIterator } from "../../src/common/types.ts";
 import type { BaseTransport } from "../../src/transport/shared.ts";
 import type { WebSocketTransport } from "../../src/transport/websocket.ts";
-import { toCollectableIterator } from "../../src/common/types.ts";
 
 // Mock transport factory functions
 vi.mock("../../src/transport/http.ts", () => ({
@@ -85,7 +85,7 @@ describe("Client API", () => {
         it("should throw error for invalid protocol", () => {
             expect(() => {
                 client({ connectionString: "mysql://user:pass@localhost:5432/mydb" });
-            }).toThrow('Invalid connection string protocol: mysql:');
+            }).toThrow("Invalid connection string protocol: mysql:");
         });
 
         it("should throw error for missing username", () => {
@@ -106,11 +106,13 @@ describe("Client API", () => {
             const mockRows = [["1"], ["2"], ["3"]];
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "num", oid: 23 }],
-                rows: toCollectableIterator((async function* () {
-                    for (const row of mockRows) {
-                        yield row;
-                    }
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        for (const row of mockRows) {
+                            yield row;
+                        }
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -120,36 +122,34 @@ describe("Client API", () => {
             expect(result.columns).toEqual([{ name: "num", oid: 23 }]);
 
             const rows = await result.rows.collect();
-            expect(rows).toEqual([
-                { values: [1] },
-                { values: [2] },
-                { values: [3] },
-            ]);
+            expect(rows).toEqual([{ values: [1] }, { values: [2] }, { values: [3] }]);
         });
 
         it("should serialize parameters using default serializers", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
             const testDate = new Date("2024-01-15T10:30:00Z");
-            const bigNum = BigInt("9007199254740991");
+            const bigNum = 9007199254740991n;
 
             await cl.query("SELECT $1, $2, $3, $4, $5", "text", 42, testDate, bigNum, true);
 
-            expect(mockHttpTransport.statement).toHaveBeenCalledWith(
-                "query",
-                "SELECT $1, $2, $3, $4, $5",
-                ["text", "42", "2024-01-15T10:30:00.000Z", "9007199254740991", "t"],
-            );
+            expect(mockHttpTransport.statement).toHaveBeenCalledWith("query", "SELECT $1, $2, $3, $4, $5", [
+                "text",
+                "42",
+                "2024-01-15T10:30:00.000Z",
+                "9007199254740991",
+                "t",
+            ]);
         });
 
         it("should serialize null and undefined parameters as null", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -161,7 +161,7 @@ describe("Client API", () => {
         it("should use custom serializers when provided", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({
@@ -182,9 +182,11 @@ describe("Client API", () => {
         it("should use custom parsers when provided", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "flag", oid: 16 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["t"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["t"];
+                    })(),
+                ),
             });
 
             const cl = client({
@@ -192,7 +194,7 @@ describe("Client API", () => {
                 parsers: [
                     {
                         oid: 16,
-                        parse: ((value) => (value === "t" ? "TRUE" : "FALSE")),
+                        parse: (value) => (value === "t" ? "TRUE" : "FALSE"),
                     },
                 ],
             });
@@ -206,9 +208,11 @@ describe("Client API", () => {
         it("should parse null values correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "nullable", oid: 25 }],
-                rows: toCollectableIterator((async function* () {
-                    yield [null];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield [null];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -221,9 +225,11 @@ describe("Client API", () => {
         it("should parse JSON/JSONB values", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "data", oid: 3802 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ['{"key": "value"}'];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ['{"key": "value"}'];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -238,9 +244,11 @@ describe("Client API", () => {
         it("should delegate to HTTP transport and return rowsAffected", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "rowsAffected", oid: 23 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["42"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["42"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -255,9 +263,11 @@ describe("Client API", () => {
         it("should serialize parameters correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "rowsAffected", oid: 23 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["10"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["10"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -273,7 +283,7 @@ describe("Client API", () => {
         it("should throw error if exec response is malformed", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -312,9 +322,11 @@ describe("Client API", () => {
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
             vi.mocked(mockWsTransport.statement).mockResolvedValue({
                 columns: [{ name: "result", oid: 25 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["session-query"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["session-query"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -336,9 +348,11 @@ describe("Client API", () => {
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
             vi.mocked(mockWsTransport.statement).mockResolvedValue({
                 columns: [{ name: "rowsAffected", oid: 23 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["5"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["5"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -363,9 +377,11 @@ describe("Client API", () => {
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
             vi.mocked(mockWsTransport.statement).mockResolvedValue({
                 columns: [{ name: "flag", oid: 16 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["t"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["t"];
+                    })(),
+                ),
             });
 
             const cl = client({
@@ -373,7 +389,7 @@ describe("Client API", () => {
                 parsers: [
                     {
                         oid: 16,
-                        parse: ((value) => (value === "t" ? "CLIENT_TRUE" : "CLIENT_FALSE")),
+                        parse: (value) => (value === "t" ? "CLIENT_TRUE" : "CLIENT_FALSE"),
                     },
                 ],
             });
@@ -382,7 +398,7 @@ describe("Client API", () => {
                 parsers: [
                     {
                         oid: 16,
-                        parse: ((value) => (value === "t" ? "SESSION_TRUE" : "SESSION_FALSE")),
+                        parse: (value) => (value === "t" ? "SESSION_TRUE" : "SESSION_FALSE"),
                     },
                 ],
             });
@@ -403,7 +419,7 @@ describe("Client API", () => {
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
             vi.mocked(mockWsTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({
@@ -489,10 +505,12 @@ describe("Client API", () => {
         it("should parse boolean (oid 16) correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "flag", oid: 16 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["t"];
-                    yield ["f"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["t"];
+                        yield ["f"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -506,9 +524,11 @@ describe("Client API", () => {
         it("should parse int2 (oid 21) correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "num", oid: 21 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["42"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["42"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -521,9 +541,11 @@ describe("Client API", () => {
         it("should parse int4 (oid 23) correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "num", oid: 23 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["123456"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["123456"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -535,10 +557,15 @@ describe("Client API", () => {
 
         it("should parse int4 (oid 23) null correctly with nullPassThrough", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
-                columns: [{ name: "num", oid: 23 }, { name: "num2", oid: 23 }],
-                rows: toCollectableIterator((async function* () {
-                    yield [null, "456"];
-                })()),
+                columns: [
+                    { name: "num", oid: 23 },
+                    { name: "num2", oid: 23 },
+                ],
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield [null, "456"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -553,10 +580,15 @@ describe("Client API", () => {
 
         it("should parse int8 (oid 20) as BigInt", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
-                columns: [{ name: "num", oid: 20 }, { name: "num2", oid: 20 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["9007199254740992", null];
-                })()),
+                columns: [
+                    { name: "num", oid: 20 },
+                    { name: "num2", oid: 20 },
+                ],
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["9007199254740992", null];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -564,17 +596,22 @@ describe("Client API", () => {
             const rows = await result.rows.collect();
 
             // Should parse as BigInt to preserve precision
-            expect(rows[0].values[0]).toBe(BigInt("9007199254740992"));
+            expect(rows[0].values[0]).toBe(9007199254740992n);
             // Should handle null correctly with nullPassThrough
             expect(rows[0].values[1]).toBe(null);
         });
 
         it("should parse float4 (oid 700) correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
-                columns: [{ name: "num", oid: 700 }, { name: "num2", oid: 700 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["3.14", null];
-                })()),
+                columns: [
+                    { name: "num", oid: 700 },
+                    { name: "num2", oid: 700 },
+                ],
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["3.14", null];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -588,24 +625,28 @@ describe("Client API", () => {
         it("should parse float8 (oid 701) correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "num", oid: 701 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["3.141592653589793"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["3.141592653589793"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
             const result = await cl.query("SELECT 3.141592653589793::float8");
             const rows = await result.rows.collect();
 
-            expect(rows[0].values[0]).toBeCloseTo(3.141592653589793);
+            expect(rows[0].values[0]).toBeCloseTo(Math.PI);
         });
 
         it("should parse text (oid 25) as-is", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "text", oid: 25 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["hello world"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["hello world"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -618,9 +659,11 @@ describe("Client API", () => {
         it("should parse varchar (oid 1043) as-is", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "text", oid: 1043 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["varchar value"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["varchar value"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -633,9 +676,11 @@ describe("Client API", () => {
         it("should parse json (oid 114) correctly", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "data", oid: 114 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ['{"foo": "bar"}'];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ['{"foo": "bar"}'];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -648,9 +693,11 @@ describe("Client API", () => {
         it("should return raw string value for unknown OID (parser fallback)", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [{ name: "unknown", oid: 99999 }],
-                rows: toCollectableIterator((async function* () {
-                    yield ["raw-value"];
-                })()),
+                rows: toCollectableIterator(
+                    (async function* () {
+                        yield ["raw-value"];
+                    })(),
+                ),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -666,7 +713,7 @@ describe("Client API", () => {
         it("should serialize Date to ISO string", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -681,11 +728,11 @@ describe("Client API", () => {
         it("should serialize BigInt to string", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
-            const bigNum = BigInt("9007199254740991");
+            const bigNum = 9007199254740991n;
             await cl.query("SELECT $1", bigNum);
 
             expect(mockHttpTransport.statement).toHaveBeenCalledWith("query", "SELECT $1", ["9007199254740991"]);
@@ -694,7 +741,7 @@ describe("Client API", () => {
         it("should serialize boolean to t/f", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -706,7 +753,7 @@ describe("Client API", () => {
         it("should serialize number to string", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
@@ -718,7 +765,7 @@ describe("Client API", () => {
         it("should fall back to String() for unknown types", async () => {
             vi.mocked(mockHttpTransport.statement).mockResolvedValue({
                 columns: [],
-                rows: toCollectableIterator((async function* () { })()),
+                rows: toCollectableIterator((async function* () {})()),
             });
 
             const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });

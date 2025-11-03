@@ -4,9 +4,11 @@
 
 import {
     BINARY,
+    type DatabaseErrorDetails,
     type ParameterFormat,
     type RawParameter,
     TEXT,
+    ValidationError,
     boundedByteStreamParameter,
     isBoundedByteStreamParameter,
     isByteArrayParameter,
@@ -68,11 +70,7 @@ export type CommandComplete = {
 };
 
 export type ErrorFrame = {
-    error: {
-        message: string;
-        code: string;
-        [key: string]: string;
-    };
+    error: DatabaseErrorDetails;
 };
 
 export type ResponseFrame = DataRowDescription | DataRow | CommandComplete | ErrorFrame;
@@ -269,7 +267,7 @@ export async function requestFrames(
                 value: null,
             });
         } else {
-            throw new Error(`unsupported raw parameter type: ${param}`);
+            throw new ValidationError(`unsupported raw parameter type: ${param}`);
         }
     }
 

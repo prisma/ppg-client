@@ -1,4 +1,4 @@
-import type { RawParameter } from "../common/types.ts";
+import { HttpResponseError, type RawParameter } from "../common/types.ts";
 import { type RequestFrame, type StatementKind, requestFrames } from "./frames.ts";
 import { createMultipartStream } from "./multipart.ts";
 import { parseNDJSONResponse } from "./ndjson.ts";
@@ -61,7 +61,9 @@ async function request({ headers, keepalive, frames, url }: QueryHttpRequest): P
     const response = await fetch(url, requestInit);
 
     if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+        const responseText = await response.text();
+        const message = responseText || `HTTP error ${response.status}: ${response.statusText}`;
+        throw new HttpResponseError({ message, statusCode: response.status });
     }
 
     // Parse NDJSON response and create StatementResponse

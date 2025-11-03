@@ -1,4 +1,4 @@
-import { isBoundedByteStreamParameter, isByteArrayParameter } from "../common/types.ts";
+import { ValidationError, isBoundedByteStreamParameter, isByteArrayParameter } from "../common/types.ts";
 import { type RequestFrame, isExtendedParamFrame, isQueryDescriptorFrame } from "./frames.ts";
 import { FRAME_URNS, MIME_TYPES } from "./shared.ts";
 
@@ -57,7 +57,7 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                         }
                         yield textEncoder.encode("\r\n");
                     } else {
-                        throw new Error(
+                        throw new ValidationError(
                             `Unsupported text extended parameter data type. Expected string, ByteArrayParameter, or BoundedByteStream, got: ${typeof param}`,
                         );
                     }
@@ -89,13 +89,13 @@ export function createMultipartStream(frames: RequestFrame[], boundary: string):
                         }
                         yield textEncoder.encode("\r\n");
                     } else {
-                        throw new Error(
+                        throw new ValidationError(
                             `Unsupported binary extended parameter data type. Expected string, ByteArrayParameter, or BoundedByteStream, got: ${typeof extendedParam.data}`,
                         );
                     }
                 }
             } else {
-                throw new Error(
+                throw new ValidationError(
                     `Unsupported frame type. Expected QueryDescriptorFrame or ExtendedParamFrame, got: ${JSON.stringify(frame)}`,
                 );
             }

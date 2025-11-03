@@ -1,4 +1,4 @@
-import type { RawParameter } from "../common/types.ts";
+import { type RawParameter, ValidationError, WebSocketError } from "../common/types.ts";
 import { type RequestFrame, type StatementKind, requestFrames } from "./frames.ts";
 import { type BaseTransport, FRAME_URNS, type StatementResponse, type TransportConfig } from "./shared.ts";
 import { type WsTransportConnection, wsTransportConnection } from "./websocket-conn.ts";
@@ -39,7 +39,7 @@ export function webSocketTransport(config: TransportConfig): WebSocketTransport 
         },
         async statement(kind: StatementKind, sql: string, parameters: RawParameter[]): Promise<StatementResponse> {
             if (!conn?.isReady()) {
-                throw new Error("WebSocket is not connected");
+                throw new WebSocketError({ message: "WebSocket is not connected" });
             }
 
             // Prepare the request frames
@@ -51,8 +51,9 @@ export function webSocketTransport(config: TransportConfig): WebSocketTransport 
             const enqueuedQuery = conn.enqueueNewQuery();
 
             const activeConn = conn;
+
             // Chain this send operation to the queue to ensure sequential execution...
-            sendQueue = sendQueue.then(() => sendFrames(activeConn, frames)).catch(enqueuedQuery.abort);
+            sendQueue = sendQueue.then(() => sendFrames(activeConn, frames)).catch(enqueuedQuery.abort); // abort makes all enqueuedQuery promises reject.
 
             // ...and wait for it to complete (so it blocks on backpressure)
             await sendQueue;
@@ -108,7 +109,7 @@ async function sendFrames(conn: WsTransportConnection, frames: RequestFrame[]): 
                     await conn.send(bytes);
                 }
             } else {
-                throw new Error(`Unsupported extended parameter data type: ${typeof frame.data}`);
+                throw new ValidationError(`Unsupported extended parameter data type: ${typeof frame.data}`);
             }
         }
     }

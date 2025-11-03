@@ -3,8 +3,8 @@ import Busboy from "busboy";
 import { expect, vi } from "vitest";
 import { BINARY, byteArrayParameter } from "../../src/common/types.ts";
 import type { ExtendedParamFrame, QueryDescriptorFrame, ResponseFrame } from "../../src/transport/frames.ts";
+import type { Column } from "../../src/transport/shared.ts";
 import { utf8ByteLength } from "../../src/transport/shims.ts";
-import { Column } from "../../src/transport/shared.ts";
 
 /**
  * Mock HTTP Server for testing the HTTP transport.

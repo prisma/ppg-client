@@ -1,4 +1,4 @@
-import { toCollectableIterator, DatabaseError } from "../common/types.ts";
+import { DatabaseError, toCollectableIterator } from "../common/types.ts";
 import {
     type DataRow,
     type DataRowDescription,
@@ -8,7 +8,7 @@ import {
     isDataRowDescription,
     isErrorFrame,
 } from "./frames.ts";
-import { Column, FRAME_URNS, type StatementResponse } from "./shared.ts";
+import { type Column, FRAME_URNS, type StatementResponse } from "./shared.ts";
 import { type Deferred, createDeferred, emptyIterableIterator } from "./shims.ts";
 
 type RowIteratorResult = IteratorResult<(string | null)[]>;
@@ -106,7 +106,7 @@ function newRunningQuery(): RunningQuery {
     }
 
     function error({ error }: ErrorFrame) {
-        const err = new DatabaseError(error.message, error.code, error);
+        const err = new DatabaseError(error);
         abort(err);
     }
 
