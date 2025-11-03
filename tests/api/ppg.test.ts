@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Client, Session } from "../../src/api/client.ts";
 import { prismaPostgres } from "../../src/api/ppg.ts";
 import { toCollectableIterator } from "../../src/common/types.ts";
-import type { Client, Session } from "../../src/api/client.ts";
 
 // Mock the client module
 vi.mock("../../src/api/client.ts", async () => {
@@ -85,10 +85,7 @@ describe("PrismaPostgres API", () => {
                     { name: "id", oid: 23 },
                     { name: "name", oid: 25 },
                 ];
-                const mockRows = [
-                    { values: ["1", "Alice"] },
-                    { values: ["2", "Bob"] },
-                ];
+                const mockRows = [{ values: ["1", "Alice"] }, { values: ["2", "Bob"] }];
 
                 return {
                     columns,
@@ -104,7 +101,10 @@ describe("PrismaPostgres API", () => {
 
             const ppg = prismaPostgres({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
             const userId = 1;
-            const rows = await ppg.sql<{ id: string; name: string }>`SELECT id, name FROM users WHERE id > ${userId}`.collect();
+            const rows = await ppg.sql<{
+                id: string;
+                name: string;
+            }>`SELECT id, name FROM users WHERE id > ${userId}`.collect();
 
             expect(mockClient.query).toHaveBeenCalledWith("SELECT id, name FROM users WHERE id > $1", 1);
             expect(rows).toEqual([
@@ -151,7 +151,9 @@ describe("PrismaPostgres API", () => {
             const age = 30;
             const active = true;
 
-            await ppg.sql<{ result: string }>`SELECT * FROM users WHERE name = ${name} AND age = ${age} AND active = ${active}`.collect();
+            await ppg.sql<{
+                result: string;
+            }>`SELECT * FROM users WHERE name = ${name} AND age = ${age} AND active = ${active}`.collect();
 
             expect(mockClient.query).toHaveBeenCalledWith(
                 "SELECT * FROM users WHERE name = $1 AND age = $2 AND active = $3",
@@ -218,7 +220,9 @@ describe("PrismaPostgres API", () => {
             });
 
             const ppg = prismaPostgres({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
-            const rows = await ppg.query<{ id: string; name: string }>("SELECT id, name FROM users WHERE id = $1", 1).collect();
+            const rows = await ppg
+                .query<{ id: string; name: string }>("SELECT id, name FROM users WHERE id = $1", 1)
+                .collect();
 
             expect(mockClient.query).toHaveBeenCalledWith("SELECT id, name FROM users WHERE id = $1", 1);
             expect(rows).toEqual([{ id: "1", name: "Alice" }]);
@@ -257,9 +261,15 @@ describe("PrismaPostgres API", () => {
             });
 
             const ppg = prismaPostgres({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
-            await ppg.query<{ result: string }>("SELECT * FROM users WHERE name = $1 AND age = $2", "Alice", 30).collect();
+            await ppg
+                .query<{ result: string }>("SELECT * FROM users WHERE name = $1 AND age = $2", "Alice", 30)
+                .collect();
 
-            expect(mockClient.query).toHaveBeenCalledWith("SELECT * FROM users WHERE name = $1 AND age = $2", "Alice", 30);
+            expect(mockClient.query).toHaveBeenCalledWith(
+                "SELECT * FROM users WHERE name = $1 AND age = $2",
+                "Alice",
+                30,
+            );
         });
     });
 
@@ -333,7 +343,10 @@ describe("PrismaPostgres API", () => {
             vi.mocked(mockSession.exec).mockResolvedValue(1);
             vi.mocked(mockSession.query)
                 .mockResolvedValueOnce({
-                    columns: [{ name: "id", oid: 23 }, { name: "name", oid: 25 }],
+                    columns: [
+                        { name: "id", oid: 23 },
+                        { name: "name", oid: 25 },
+                    ],
                     rows: toCollectableIterator(
                         (async function* () {
                             yield { values: ["1", "Alice"] };
@@ -341,7 +354,10 @@ describe("PrismaPostgres API", () => {
                     ),
                 })
                 .mockResolvedValueOnce({
-                    columns: [{ name: "id", oid: 23 }, { name: "name", oid: 25 }],
+                    columns: [
+                        { name: "id", oid: 23 },
+                        { name: "name", oid: 25 },
+                    ],
                     rows: toCollectableIterator(
                         (async function* () {
                             yield { values: ["2", "Bob"] };
@@ -360,7 +376,9 @@ describe("PrismaPostgres API", () => {
                 await tx.sql.exec`INSERT INTO users VALUES (${2}, ${"Bob"})`;
 
                 // raw query
-                const users2 = await tx.query<{ id: string; name: string }>("SELECT * FROM users WHERE id = $1", 2).collect();
+                const users2 = await tx
+                    .query<{ id: string; name: string }>("SELECT * FROM users WHERE id = $1", 2)
+                    .collect();
                 expect(users2).toEqual([{ id: "2", name: "Bob" }]);
 
                 // raw exec
@@ -437,7 +455,13 @@ describe("PrismaPostgres API", () => {
             expect(affected1).toBe(1);
             expect(affected2).toBe(2);
             expect(mockSession.exec).toHaveBeenCalledWith("INSERT INTO users VALUES ($1, $2)", 1, "Alice");
-            expect(mockSession.exec).toHaveBeenCalledWith("INSERT INTO users VALUES ($1, $2), ($3, $4)", 2, "Bob", 3, "Charlie");
+            expect(mockSession.exec).toHaveBeenCalledWith(
+                "INSERT INTO users VALUES ($1, $2), ($3, $4)",
+                2,
+                "Bob",
+                3,
+                "Charlie",
+            );
         });
 
         it("should execute batch with mixed query and exec statements", async () => {
@@ -629,7 +653,9 @@ describe("PrismaPostgres API", () => {
             });
 
             const ppg = prismaPostgres({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
-            const rows = await ppg.query<{ id: string; name: string; age: string }>("SELECT id, name, age FROM users").collect();
+            const rows = await ppg
+                .query<{ id: string; name: string; age: string }>("SELECT id, name, age FROM users")
+                .collect();
 
             expect(rows).toEqual([{ id: "1", name: "Alice", age: "30" }]);
         });
@@ -648,7 +674,9 @@ describe("PrismaPostgres API", () => {
             });
 
             const ppg = prismaPostgres({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
-            const rows = await ppg.query<{ id: string; nullable: string | null }>("SELECT id, nullable FROM test").collect();
+            const rows = await ppg
+                .query<{ id: string; nullable: string | null }>("SELECT id, nullable FROM test")
+                .collect();
 
             expect(rows).toEqual([{ id: "1", nullable: null }]);
         });

@@ -11,7 +11,7 @@ export interface WsTransportConnection {
     close(): void;
 }
 
-const WS_REQUEST_PATH = "/db/websocket"; // TODO: change this
+const WS_REQUEST_PATH = "/v0/session";
 const WS_SUBPROTOCOL = "prisma-postgres-1.0";
 const MAX_BACKOFF_MS = 100;
 

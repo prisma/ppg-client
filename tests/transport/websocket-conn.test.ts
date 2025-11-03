@@ -51,7 +51,7 @@ describe("wsTransportConnection", () => {
 
             await runEventLoop();
 
-            expect(getMockWs().url).toBe("ws://localhost:3000/db/websocket");
+            expect(getMockWs().url).toBe("ws://localhost:3000/v0/session");
             expect(getMockWs().protocol).toBe("prisma-postgres-1.0");
 
             // Send auth response to complete connection
