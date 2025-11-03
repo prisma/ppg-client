@@ -21,7 +21,7 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
     url.protocol = url.protocol.replace("http", "ws");
 
     if (config.database) {
-        url.searchParams.set("database", config.database);
+        url.searchParams.set("db", config.database);
     }
 
     // Create WebSocket connection with required subprotocol
@@ -93,11 +93,8 @@ export async function wsTransportConnection(config: TransportConfig): Promise<Ws
             closureReason: event.reason,
         });
 
-        if (queryQueue.isEmpty()) {
-            authDeferred.reject(err);
-        } else {
-            queryQueue.abortAll(err);
-        }
+        authDeferred.reject(err);
+        queryQueue.abortAll(err);
     };
 
     const isBusy = wsBusyCheck(ws);

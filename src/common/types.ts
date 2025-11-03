@@ -154,13 +154,13 @@ export class ValidationError extends GenericError {
     }
 }
 
-interface HttpRequestErrorDetails {
+interface HttpResponseErrorDetails {
     readonly statusCode: number;
     readonly message: string;
 }
 export class HttpResponseError extends GenericError {
     public readonly status: number;
-    constructor({ message, statusCode }: HttpRequestErrorDetails, opts?: ErrorOptions) {
+    constructor({ message, statusCode }: HttpResponseErrorDetails, opts?: ErrorOptions) {
         super(message, opts);
         this.name = new.target.name;
         this.status = statusCode;

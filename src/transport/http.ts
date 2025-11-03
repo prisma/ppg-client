@@ -16,7 +16,7 @@ export function httpTransport(config: TransportConfig): HttpTransport {
         // Construct the full URL
         const url = new URL(HTTP_REQUEST_PATH, config.endpoint);
         if (config.database) {
-            url.searchParams.set("database", config.database);
+            url.searchParams.set("db", config.database);
         }
 
         // Prepare authentication headers

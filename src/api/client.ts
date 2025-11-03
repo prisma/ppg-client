@@ -253,9 +253,7 @@ function parseConnectionString(connectionString: string): TransportConfig {
         throw new Error("Connection string must include username and password");
     }
 
-    // Construct HTTP endpoint (using port 80 for now)
-    const httpPort = "54320";
-    const endpoint = `http://${hostname}:${httpPort}`;
+    const endpoint = `https://${hostname}`;
 
     return {
         endpoint,
@@ -327,11 +325,15 @@ const DEFAULT_SERIALIZERS: ValueSerializer<unknown>[] = [
 ];
 
 /**
- * Creates a new client.
- * @param config Client configuration.
+ * Creates a new {@link Client}.
+ * @param config Client configuration ({@link ClientConfig}).
  */
 export function client(config: ClientConfig): Client {
-    const transportConfig = parseConnectionString(config.connectionString);
+    const transportConfig =
+        "transportConfig" in config
+            ? (config.transportConfig as TransportConfig)
+            : // override the config for testing
+              parseConnectionString(config.connectionString);
 
     // Merge parsers: user parsers override defaults
     const parsersMap = [...DEFAULT_PARSERS, ...(config.parsers || [])].reduce(

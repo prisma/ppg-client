@@ -620,7 +620,7 @@ describe("HTTP Transport", () => {
             await transport.statement("query", "SELECT 1", []);
 
             const request = mockServer.getReceivedRequest();
-            expect(request?.url).toContain("database=mydb");
+            expect(request?.url).toContain("db=mydb");
         });
 
         it("should not include database parameter when not provided", async () => {
@@ -639,7 +639,7 @@ describe("HTTP Transport", () => {
             await transport.statement("query", "SELECT 1", []);
 
             const request = mockServer.getReceivedRequest();
-            expect(request?.url).not.toContain("database=");
+            expect(request?.url).not.toContain("db=");
         });
     });
 });

@@ -1,9 +1,8 @@
 import type { CollectableIterator } from "../common/types.ts";
-import type { ClientConfig } from "./client.ts";
+import { toCollectableIterator } from "../common/types.ts";
+import { type ClientConfig, type Statements, client } from "./client.ts";
 
 export interface PrismaPostgresConfig extends ClientConfig {}
-
-export declare function prismaPostgres(config: PrismaPostgresConfig): PrismaPostgres;
 
 /**
  * SQL template literal tag interface for query execution.
@@ -30,7 +29,10 @@ export interface SqlTemplateStatements {
      * const allUsers = await rows.collect();
      * ```
      */
-    <R = unknown>(strings: TemplateStringsArray, ...values: unknown[]): CollectableIterator<R>;
+    <R extends NonNullable<object> = Record<string, unknown>>(
+        strings: TemplateStringsArray,
+        ...values: unknown[]
+    ): CollectableIterator<R>;
 
     /**
      * Executes a SQL command using template literal syntax and returns the number of affected rows.
@@ -86,7 +88,10 @@ export interface PrismaPostgresStatements {
      * const allUsers = await rows.collect();
      * ```
      */
-    query<R = unknown>(sql: string, ...params: unknown[]): CollectableIterator<R>;
+    query<R extends NonNullable<object> = Record<string, unknown>>(
+        sql: string,
+        ...params: unknown[]
+    ): CollectableIterator<R>;
 
     /**
      * Executes a SQL command (INSERT, UPDATE, DELETE) and returns the number of affected rows.
@@ -125,6 +130,23 @@ export interface PrismaPostgresTransactions {
     transaction<T = void>(callback: (statements: PrismaPostgresStatements) => Promise<T>): Promise<T>;
 
     /**
+     * Starts building a batch transaction using a fluent API.
+     * Useful for dynamically constructing batches or when you prefer method chaining.
+     *
+     * @returns A BatchQueryBuilder to chain query/exec calls and execute the batch
+     *
+     * ```ts
+     * const [orders, affected, users] = await ppg.batch()
+     *   .query<Order>("SELECT * FROM orders WHERE id = $1", orderId)
+     *   .exec("UPDATE inventory SET stock = stock - $1 WHERE id = $2", qty, inventoryId)
+     *   .query<User>("SELECT * FROM users WHERE id = $1", userId)
+     *   .run();
+     * // orders: Order[], affected: number, users: User[]
+     * ```
+     */
+    batch(): BatchQueryBuilder<[]>;
+
+    /**
      * Executes a batch transaction with a fixed set of queries or commands. The transaction BEGIN
      * is performed automatically, followed by all queries/commands in sequence, then COMMIT is
      * performed automatically. ROLLBACK is performed automatically if any query fails.
@@ -148,24 +170,7 @@ export interface PrismaPostgresTransactions {
      * // orders: Order[], affected: number, users: User[]
      * ```
      */
-    batch<T extends BatchTuple>(...queries: BatchQuery<T>): Promise<T>;
-
-    /**
-     * Starts building a batch transaction using a fluent API.
-     * Useful for dynamically constructing batches or when you prefer method chaining.
-     *
-     * @returns A BatchQueryBuilder to chain query/exec calls and execute the batch
-     *
-     * ```ts
-     * const [orders, affected, users] = await ppg.batch()
-     *   .query<Order>("SELECT * FROM orders WHERE id = $1", orderId)
-     *   .exec("UPDATE inventory SET stock = stock - $1 WHERE id = $2", qty, inventoryId)
-     *   .query<User>("SELECT * FROM users WHERE id = $1", userId)
-     *   .run();
-     * // orders: Order[], affected: number, users: User[]
-     * ```
-     */
-    batch(): BatchQueryBuilder<[]>;
+    batch<T extends BatchTuple>(...statements: StatementsBatch<T>): Promise<T>;
 }
 
 /**
@@ -191,7 +196,10 @@ export interface BatchQueryBuilder<T extends BatchTuple> {
      * @param params - Query parameters
      * @returns Builder with the new query appended to the result tuple
      */
-    query<R = unknown>(sql: string, ...params: unknown[]): BatchQueryBuilder<[...T, R[]]>;
+    query<R extends NonNullable<object> = Record<string, unknown>>(
+        sql: string,
+        ...params: unknown[]
+    ): BatchQueryBuilder<[...T, R[]]>;
 
     /**
      * Adds an INSERT/UPDATE/DELETE command to the batch that returns affected row count.
@@ -245,6 +253,157 @@ export interface ExecStatement {
  * - Number types in the tuple require ExecStatement
  * - Array types in the tuple require QueryStatement
  */
-export type BatchQuery<T extends BatchTuple = BatchTuple> = {
+export type StatementsBatch<T extends BatchTuple = BatchTuple> = {
     [K in keyof T]: T[K] extends number ? ExecStatement : T[K] extends Array<unknown> ? QueryStatement : never;
 };
+
+type SupportedStatement = QueryStatement | ExecStatement;
+
+/**
+ * Creates a new high-level Prisma Postgres client with convenient query methods
+ * including SQL template literals and transaction support.
+ *
+ * @param config - Client configuration with connection string and optional parsers/serializers
+ * @returns PrismaPostgres client instance
+ *
+ * ```ts
+ * const ppg = prismaPostgres({ connectionString: "postgres://user:pass@host:5432/db" });
+ *
+ * // SQL template literals
+ * const users = await ppg.sql<User>`SELECT * FROM users WHERE id = ${userId}`.collect();
+ *
+ * // Raw queries
+ * const rows = await ppg.query<User>("SELECT * FROM users WHERE id = $1", userId).collect();
+ *
+ * // Transactions
+ * await ppg.transaction(async (sql) => {
+ *   await sql`INSERT INTO users VALUES (${userId}, ${name})`;
+ *   await sql`UPDATE subscriptions SET user_count = user_count + 1`;
+ * });
+ * ```
+ */
+export function prismaPostgres(config: PrismaPostgresConfig): PrismaPostgres {
+    const lowLevelClient = client(config);
+
+    // Create top-level statement methods
+    const prismaStatements = createPrismaStatements(lowLevelClient);
+
+    async function transaction<T = void>(callback: (statements: PrismaPostgresStatements) => Promise<T>): Promise<T> {
+        using session = await lowLevelClient.newSession();
+        const sessionStatements = createPrismaStatements(session);
+
+        try {
+            const beginPromise = session.exec("BEGIN");
+            const result = await Promise.all([beginPromise, callback(sessionStatements)]);
+            await session.exec("COMMIT");
+            return result[1];
+        } catch (error) {
+            await session.exec("ROLLBACK");
+            throw error;
+        }
+    }
+
+    function batchWithQueries<T extends BatchTuple>(...statements: SupportedStatement[]): Promise<T> {
+        return transaction(async (stmt) => {
+            const results: unknown[] = [];
+
+            for (const statement of statements) {
+                if ("query" in statement) {
+                    const rows = await stmt.query(statement.query, ...(statement.parameters || [])).collect();
+                    results.push(rows);
+                } else {
+                    const affected = await stmt.exec(statement.exec, ...(statement.parameters || []));
+                    results.push(affected);
+                }
+            }
+
+            return results as BatchTuple as T;
+        });
+    }
+
+    function batch<T extends BatchTuple>(...queries: StatementsBatch<T>): Promise<T>;
+    function batch(): BatchQueryBuilder<[]>;
+    function batch<T extends BatchTuple>(...queries: StatementsBatch<T>): Promise<T> | BatchQueryBuilder<[]> {
+        if (queries.length === 0) {
+            return createBatchQueryBuilder([]);
+        }
+        return batchWithQueries(...queries);
+    }
+
+    function createBatchQueryBuilder<T extends BatchTuple>(
+        statements: (QueryStatement | ExecStatement)[],
+    ): BatchQueryBuilder<T> {
+        return {
+            query<R extends NonNullable<unknown>>(sql: string, ...params: unknown[]): BatchQueryBuilder<[...T, R[]]> {
+                return createBatchQueryBuilder([...statements, { query: sql, parameters: params }]);
+            },
+
+            exec(sql: string, ...params: unknown[]): BatchQueryBuilder<[...T, number]> {
+                return createBatchQueryBuilder([...statements, { exec: sql, parameters: params }]);
+            },
+
+            run(): Promise<T> {
+                return batchWithQueries(...statements);
+            },
+        };
+    }
+
+    return {
+        ...prismaStatements,
+        transaction,
+        batch,
+    };
+}
+
+// Helper: convert template literals to SQL string and parameters
+function templateToSqlParams(strings: TemplateStringsArray, values: unknown[]): [string, unknown[]] {
+    let sql = strings[0];
+    for (let i = 0; i < values.length; i++) {
+        sql += `$${i + 1}${strings[i + 1]}`;
+    }
+    return [sql, values];
+}
+
+// Helper: convert row values array to object with column names as keys
+function rowToObject<R extends NonNullable<unknown>>(columns: { name: string }[], values: unknown[]): R {
+    const obj = {} as Record<string, unknown>;
+    for (let i = 0; i < columns.length; i++) {
+        obj[columns[i].name] = values[i];
+    }
+    return obj as R;
+}
+
+// Helper: create statement methods from a low-level Statements instance
+function createPrismaStatements(statements: Statements): PrismaPostgresStatements {
+    async function* rowObjectsGenerator<R extends NonNullable<object>>(sql: string, params: unknown[]) {
+        const result = await statements.query(sql, ...params);
+        for await (const row of result.rows) {
+            yield rowToObject<R>(result.columns, row.values);
+        }
+    }
+
+    function sqlTag<R extends NonNullable<object>>(
+        strings: TemplateStringsArray,
+        ...values: unknown[]
+    ): CollectableIterator<R> {
+        const [sql, params] = templateToSqlParams(strings, values);
+        return toCollectableIterator(rowObjectsGenerator(sql, params));
+    }
+
+    sqlTag.exec = async (strings: TemplateStringsArray, ...values: unknown[]): Promise<number> => {
+        const [sql, params] = templateToSqlParams(strings, values);
+        return statements.exec(sql, ...params);
+    };
+
+    return {
+        sql: sqlTag,
+
+        query<R extends NonNullable<unknown>>(sql: string, ...params: unknown[]): CollectableIterator<R> {
+            return toCollectableIterator(rowObjectsGenerator(sql, params));
+        },
+
+        async exec(sql: string, ...params: unknown[]): Promise<number> {
+            return statements.exec(sql, ...params);
+        },
+    };
+}

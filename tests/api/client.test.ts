@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { client } from "../../src/api/client.ts";
+import { type ClientConfig, client } from "../../src/api/client.ts";
 import { toCollectableIterator } from "../../src/common/types.ts";
 import type { BaseTransport } from "../../src/transport/shared.ts";
 import type { WebSocketTransport } from "../../src/transport/websocket.ts";
@@ -53,7 +53,7 @@ describe("Client API", () => {
             client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
 
             expect(httpTransport).toHaveBeenCalledWith({
-                endpoint: "http://localhost:54320",
+                endpoint: "https://localhost",
                 username: "user",
                 password: "pass",
                 database: "mydb",
@@ -64,7 +64,7 @@ describe("Client API", () => {
             client({ connectionString: "postgresql://user:pass@localhost:5432/mydb" });
 
             expect(httpTransport).toHaveBeenCalledWith({
-                endpoint: "http://localhost:54320",
+                endpoint: "https://localhost",
                 username: "user",
                 password: "pass",
                 database: "mydb",
@@ -75,7 +75,7 @@ describe("Client API", () => {
             client({ connectionString: "postgres://user:pass@localhost:5432" });
 
             expect(httpTransport).toHaveBeenCalledWith({
-                endpoint: "http://localhost:54320",
+                endpoint: "https://localhost",
                 username: "user",
                 password: "pass",
                 database: undefined,
@@ -98,6 +98,22 @@ describe("Client API", () => {
             expect(() => {
                 client({ connectionString: "postgres://user@localhost:5432/mydb" });
             }).toThrow("Connection string must include username and password");
+        });
+
+        it("should use transportConfig to override connection string parsing", () => {
+            const customConfig = {
+                endpoint: "https://custom-host:9999",
+                username: "custom-user",
+                password: "custom-pass",
+                database: "custom-db",
+            };
+
+            client({
+                connectionString: "postgres://ignored:ignored@ignored:5432/ignored",
+                transportConfig: customConfig,
+            } as ClientConfig);
+
+            expect(httpTransport).toHaveBeenCalledWith(customConfig);
         });
     });
 
@@ -305,7 +321,7 @@ describe("Client API", () => {
             await cl.newSession();
 
             expect(webSocketTransport).toHaveBeenCalledWith({
-                endpoint: "http://localhost:54320",
+                endpoint: "https://localhost",
                 username: "user",
                 password: "pass",
                 database: "mydb",

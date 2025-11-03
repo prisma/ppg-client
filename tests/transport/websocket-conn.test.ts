@@ -67,7 +67,7 @@ describe("wsTransportConnection", () => {
             const connPromise = wsTransportConnection(config);
             await runEventLoop();
 
-            expect(getMockWs().url).toContain("database=mydb");
+            expect(getMockWs().url).toContain("db=mydb");
 
             await connPromise;
         });
