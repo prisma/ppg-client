@@ -4,3 +4,4 @@
 .envrc.local
 .local.*
 *.bak
+*.tgz

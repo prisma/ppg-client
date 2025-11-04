@@ -13,6 +13,16 @@ Install this package using your package manager and registry of choice:
 * Deno: `deno add jsr:@prisma/ppg`
 * esm.sh CDN: `https://esm.sh/@prisma/ppg`
 
+## Prisma Postgres Direct TCP Connection URL
+
+**Important**: This client requires a **Prisma Postgres Direct TCP Connection** URL. This URL format is specific to Prisma Postgres and has the following structure:
+
+```
+postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require
+```
+
+You can find this connection string in the API Keys section of your Prisma Postgres dashboard. Other standard PostgreSQL connection strings will not work with this client.
+
 ## Quick Start
 
 ```ts
@@ -46,12 +56,12 @@ import { prismaPostgres, defaultClientConfig } from "@prisma/ppg";
 
 // Recommended: Use defaultClientConfig to include default parsers and serializers
 const ppg = prismaPostgres(
-  defaultClientConfig("postgres://user:password@host:port/database")
+  defaultClientConfig("postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require")
 );
 
 // Or manually configure (no default parsers/serializers):
 const ppgCustom = prismaPostgres({
-  connectionString: "postgres://user:password@host:port/database",
+  connectionString: "postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require",
   parsers: [/* your custom parsers */],
   serializers: [/* your custom serializers */]
 });
@@ -266,12 +276,12 @@ import { client, defaultClientConfig } from "@prisma/ppg";
 
 // Recommended: Use defaultClientConfig to include default parsers and serializers
 const cl = client(
-  defaultClientConfig("postgres://user:password@host:port/database")
+  defaultClientConfig("postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require")
 );
 
 // Or manually configure:
 const clCustom = client({
-  connectionString: "postgres://user:password@host:port/database",
+  connectionString: "postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require",
   parsers: [/* your custom parsers */],
   serializers: [/* your custom serializers */]
 });
@@ -415,7 +425,7 @@ const uuidParser: ValueParser<string> = {
   parse: (value: string | null) => value ? value.toUpperCase() : null
 };
 
-const config = defaultClientConfig("postgres://...");
+const config = defaultClientConfig("postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require");
 const cl = client({
   ...config,
   parsers: [...config.parsers, uuidParser], // Add to defaults
@@ -423,7 +433,7 @@ const cl = client({
 
 // Or replace defaults entirely:
 const clCustom = client({
-  connectionString: "postgres://...",
+  connectionString: "postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require",
   parsers: [uuidParser], // Only your custom parsers
 });
 ```
@@ -443,7 +453,7 @@ const pointSerializer: ValueSerializer<Point> = {
   serialize: (value: Point) => `(${value.x},${value.y})`
 };
 
-const config = defaultClientConfig("postgres://...");
+const config = defaultClientConfig("postgres://tenantId:key@db.prisma.io:5432/postgres?sslmode=require");
 const cl = client({
   ...config,
   serializers: [pointSerializer, ...config.serializers], // Your serializer first
