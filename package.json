@@ -1,6 +1,6 @@
 {
   "name": "@prisma/ppg",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lightweight client for Prisma Postgres",
   "repository": {
     "type": "git",
