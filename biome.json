@@ -1,37 +1,42 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "vcs": {
-    "enabled": false,
-    "clientKind": "git",
-    "useIgnoreFile": true
-  },
-  "files": {
-    "ignoreUnknown": false,
-    "ignore": ["dist"]
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space"
-  },
-  "organizeImports": {
-    "enabled": true
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "correctness": {
-        "useImportExtensions": "error"
-      },
-      "style": {
-        "noNonNullAssertion": "off",
-        "useShorthandFunctionType": "off"
-      }
-    }
-  },
-  "javascript": {
+    "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+    "vcs": {
+        "enabled": false,
+        "clientKind": "git",
+        "useIgnoreFile": true
+    },
+    "files": {
+        "ignoreUnknown": false,
+        "ignore": ["dist"],
+        "include": ["src/api/*", "src/common/*", "src/transport/*", "tests/**/*"]
+    },
     "formatter": {
-      "quoteStyle": "double"
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 120
+    },
+    "organizeImports": {
+        "enabled": true
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "recommended": true,
+            "correctness": {
+                "useImportExtensions": "error",
+                "noUnusedImports": "error"
+            },
+            "style": {
+                "noNonNullAssertion": "off",
+                "useShorthandFunctionType": "off"
+            }
+        }
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "double",
+            "semicolons": "always"
+        }
     }
-  }
 }
