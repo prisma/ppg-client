@@ -38,4 +38,4 @@ jobs:
       - name: Publish
         run: |
           # For public packages under @prisma
-          pnpm publish --access public
+          pnpm publish --no-git-checks --provenance --access public
