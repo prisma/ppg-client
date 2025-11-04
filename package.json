@@ -26,9 +26,7 @@
     }
   },
   "scripts": {
-    "build": "pnpm run /^build:/",
-    "build:esm": "tsup src/index.ts --format esm --dts --target esnext --out-dir dist",
-    "build:cjs": "tsup src/index.ts --format cjs --target esnext --out-dir dist",
+    "build": "tsup src/index.ts --format esm,cjs --dts --target node18 --out-dir dist",
     "format": "biome check --write",
     "test": "vitest run",
     "test:watch": "vitest",

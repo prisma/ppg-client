@@ -45,7 +45,7 @@ export async function parseNDJSONResponse(response: Response): Promise<Statement
 
                     if (isDataRowDescription(frame)) {
                         // DataRowDescription - save columns for later
-                        columns = frame.columns.map((col) => ({ name: col.name, oid: col.oid }));
+                        columns = frame.columns.map((col) => ({ name: col.name, oid: col.typeOid }));
                     } else if (isDataRow(frame)) {
                         // DataRow
                         yield frame.values;

@@ -33,7 +33,7 @@ export interface ClientConfig extends BaseConfig {
     /**
      * Use the direct TCP connection string for your Prisma Postgres database.
      */
-    connectionString: string;
+    connectionString: string | URL;
 }
 
 /**
@@ -263,12 +263,17 @@ function parseConnectionString(connectionString: string): TransportConfig {
     };
 }
 
+export function defaultClientConfig(connectionString: string | URL): ClientConfig {
+    return {
+        connectionString,
+        parsers: DEFAULT_PARSERS.map((p) => ({ ...p })),
+        serializers: DEFAULT_SERIALIZERS.map((s) => ({ ...s })),
+    };
+}
+
 const passThrough = <T>(v: T) => v;
 type NonNullParse = (value: string) => unknown;
-const nullPassThrough =
-    <T>(fn: NonNullParse) =>
-    (v: string | null) =>
-        v === null ? null : fn(v);
+const nullPassThrough = (fn: NonNullParse) => (v: string | null) => (v === null ? null : fn(v));
 
 /**
  * Default value parsers for common PostgreSQL types.
@@ -333,17 +338,17 @@ export function client(config: ClientConfig): Client {
         "transportConfig" in config
             ? (config.transportConfig as TransportConfig)
             : // override the config for testing
-              parseConnectionString(config.connectionString);
+              parseConnectionString(config.connectionString.toString());
 
     // Merge parsers: user parsers override defaults
-    const parsersMap = [...DEFAULT_PARSERS, ...(config.parsers || [])].reduce(
+    const parsersMap = (config.parsers || []).reduce(
         (map, parser) => map.set(parser.oid, parser),
         new Map<number, ValueParser<unknown>>(),
     );
     const parsers = [...parsersMap.values()];
 
     // Merge serializers: user serializers take precedence
-    const serializers = [...(config.serializers || []), ...DEFAULT_SERIALIZERS];
+    const serializers = config.serializers || [];
 
     const transport = httpTransport(transportConfig);
 
@@ -360,11 +365,7 @@ export function client(config: ClientConfig): Client {
             new Map(parsersMap);
         const sessionParsers = [...sessionParsersMap.values()];
 
-        const sessionSerializers = [
-            ...(sessionConfig?.serializers || []),
-            ...(config.serializers || []),
-            ...DEFAULT_SERIALIZERS,
-        ];
+        const sessionSerializers = [...(sessionConfig?.serializers || []), ...(config.serializers || [])];
 
         // Create session statements methods
         const sessionStatements = createStatements(sessionTransport, sessionSerializers, sessionParsers);

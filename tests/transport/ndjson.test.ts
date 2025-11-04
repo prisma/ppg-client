@@ -54,7 +54,7 @@ describe("parseNDJSONResponse", () => {
     describe("Basic functionality", () => {
         it("should parse DataRowDescription and DataRow frames", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23},{"name":"name","oid":25}]}',
+                '{"columns":[{"name":"id","typeOid":23},{"name":"name","typeOid":25}]}',
                 '{"values":["1","Alice"]}',
                 '{"values":["2","Bob"]}',
                 '{"complete":true}',
@@ -76,7 +76,7 @@ describe("parseNDJSONResponse", () => {
 
         it("should handle null values in DataRow", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23},{"name":"name","oid":25}]}',
+                '{"columns":[{"name":"id","typeOid":23},{"name":"name","typeOid":25}]}',
                 '{"values":["1",null]}',
                 '{"complete":true}',
             ]);
@@ -88,7 +88,7 @@ describe("parseNDJSONResponse", () => {
         });
 
         it("should handle empty result set (no data rows)", async () => {
-            const response = createNDJSONResponse(['{"columns":[{"name":"id","oid":23}]}', '{"complete":true}']);
+            const response = createNDJSONResponse(['{"columns":[{"name":"id","typeOid":23}]}', '{"complete":true}']);
 
             const result = await parseNDJSONResponse(response);
             const rows = await result.rows.collect();
@@ -107,7 +107,7 @@ describe("parseNDJSONResponse", () => {
 
         it("should handle ErrorFrame and throw database error", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"error":{"message":"division by zero","code":"22012"}}',
             ]);
@@ -119,7 +119,7 @@ describe("parseNDJSONResponse", () => {
 
         it("should handle ErrorFrame with additional error details", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"error":{"message":"syntax error","code":"42601","detail":"unexpected token"}}',
             ]);
@@ -132,7 +132,7 @@ describe("parseNDJSONResponse", () => {
         it("should silently ignore unsupported frame types", async () => {
             // Test the implicit else branch when none of the type guards match
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"unsupportedFrameType":"some data"}',
                 '{"values":["2"]}',
@@ -151,7 +151,7 @@ describe("parseNDJSONResponse", () => {
         it("should handle chunked streaming across frame boundaries", async () => {
             // Simulate chunks that split JSON frames
             const response = createChunkedNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}\n{"val',
+                '{"columns":[{"name":"id","typeOid":23}]}\n{"val',
                 'ues":["1"]}\n{"values":["2"]}\n',
                 '{"complete":true}',
             ]);
@@ -164,7 +164,7 @@ describe("parseNDJSONResponse", () => {
 
         it("should handle empty lines and whitespace", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 "",
                 "   ",
                 '{"values":["1"]}',
@@ -184,7 +184,7 @@ describe("parseNDJSONResponse", () => {
             const stream = new ReadableStream({
                 start(controller) {
                     // Send frames without final newline
-                    controller.enqueue(encoder.encode('{"columns":[{"name":"id","oid":23}]}\n'));
+                    controller.enqueue(encoder.encode('{"columns":[{"name":"id","typeOid":23}]}\n'));
                     controller.enqueue(encoder.encode('{"values":["1"]}\n'));
                     controller.enqueue(encoder.encode('{"complete":true}'));
                     controller.close();
@@ -201,7 +201,7 @@ describe("parseNDJSONResponse", () => {
         it("should handle stream ending after processing all frames", async () => {
             // This tests lines 63-64: the if (done) break after CommandComplete
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"values":["2"]}',
                 '{"complete":true}',
@@ -231,7 +231,7 @@ describe("parseNDJSONResponse", () => {
         it("should handle stream ending without CommandComplete frame", async () => {
             // Test line 64: break when done=true without hitting CommandComplete
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"values":["2"]}',
                 // No CommandComplete frame - stream just ends
@@ -248,7 +248,7 @@ describe("parseNDJSONResponse", () => {
     describe("First row handling", () => {
         it("should correctly yield first row and subsequent rows", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"values":["2"]}',
                 '{"values":["3"]}',
@@ -277,7 +277,7 @@ describe("parseNDJSONResponse", () => {
         });
 
         it("should handle case where first result is done (no data rows)", async () => {
-            const response = createNDJSONResponse(['{"columns":[{"name":"id","oid":23}]}', '{"complete":true}']);
+            const response = createNDJSONResponse(['{"columns":[{"name":"id","typeOid":23}]}', '{"complete":true}']);
 
             const result = await parseNDJSONResponse(response);
             const rows = await result.rows.collect();
@@ -289,7 +289,7 @@ describe("parseNDJSONResponse", () => {
     describe("Resource cleanup", () => {
         it("should release reader lock in finally block on normal completion", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"complete":true}',
             ]);
@@ -303,7 +303,7 @@ describe("parseNDJSONResponse", () => {
 
         it("should release reader lock in finally block on error", async () => {
             const response = createNDJSONResponse([
-                '{"columns":[{"name":"id","oid":23}]}',
+                '{"columns":[{"name":"id","typeOid":23}]}',
                 '{"values":["1"]}',
                 '{"error":{"message":"test error","code":"TEST"}}',
             ]);

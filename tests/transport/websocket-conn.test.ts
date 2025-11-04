@@ -126,7 +126,7 @@ describe("wsTransportConnection", () => {
             getMockWs().simulateMessage(FRAME_URNS.dataRowDescriptionUrn);
             getMockWs().simulateMessage(
                 JSON.stringify({
-                    columns: [{ name: "id", oid: 23 }],
+                    columns: [{ name: "id", typeOid: 23 }],
                 }),
             );
 
@@ -150,7 +150,7 @@ describe("wsTransportConnection", () => {
             getMockWs().simulateMessage(FRAME_URNS.dataRowDescriptionUrn);
             getMockWs().simulateMessage(
                 JSON.stringify({
-                    columns: [{ name: "id", oid: 23 }],
+                    columns: [{ name: "id", typeOid: 23 }],
                 }),
             );
 

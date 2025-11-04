@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type ClientConfig, client } from "../../src/api/client.ts";
+import { type ClientConfig, client, defaultClientConfig } from "../../src/api/client.ts";
 import { toCollectableIterator } from "../../src/common/types.ts";
 import type { BaseTransport } from "../../src/transport/shared.ts";
 import type { WebSocketTransport } from "../../src/transport/websocket.ts";
@@ -131,7 +131,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT * FROM users");
 
             expect(mockHttpTransport.statement).toHaveBeenCalledWith("query", "SELECT * FROM users", []);
@@ -147,7 +147,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const testDate = new Date("2024-01-15T10:30:00Z");
             const bigNum = 9007199254740991n;
 
@@ -168,7 +168,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             await cl.query("SELECT $1, $2", null, undefined);
 
             expect(mockHttpTransport.statement).toHaveBeenCalledWith("query", "SELECT $1, $2", [null, null]);
@@ -231,7 +231,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT NULL as nullable");
             const rows = await result.rows.collect();
 
@@ -248,7 +248,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT '{}'::jsonb as data");
             const rows = await result.rows.collect();
 
@@ -267,7 +267,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const affected = await cl.exec("DELETE FROM users WHERE id = $1", "123");
 
             expect(mockHttpTransport.statement).toHaveBeenCalledWith("exec", "DELETE FROM users WHERE id = $1", [
@@ -286,7 +286,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             await cl.exec("UPDATE users SET active = $1 WHERE age > $2", true, 18);
 
             expect(mockHttpTransport.statement).toHaveBeenCalledWith(
@@ -302,7 +302,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
 
             await expect(cl.exec("DELETE FROM users")).rejects.toThrow("Protocol error");
         });
@@ -317,7 +317,7 @@ describe("Client API", () => {
             } as unknown as WebSocketTransport;
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             await cl.newSession();
 
             expect(webSocketTransport).toHaveBeenCalledWith({
@@ -345,7 +345,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const session = await cl.newSession();
 
             const result = await session.query("SELECT 'session-query'");
@@ -371,7 +371,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const session = await cl.newSession();
 
             const affected = await session.exec("INSERT INTO test VALUES (1), (2), (3), (4), (5)");
@@ -473,7 +473,7 @@ describe("Client API", () => {
             } as unknown as WebSocketTransport;
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const session = await cl.newSession();
 
             expect(session.active).toBe(true);
@@ -490,7 +490,7 @@ describe("Client API", () => {
             } as unknown as WebSocketTransport;
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const session = await cl.newSession();
 
             session.close();
@@ -508,7 +508,7 @@ describe("Client API", () => {
             } as unknown as WebSocketTransport;
             vi.mocked(webSocketTransport).mockReturnValue(mockWsTransport);
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const session = await cl.newSession();
 
             session[Symbol.dispose]();
@@ -529,7 +529,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT true, false");
             const rows = await result.rows.collect();
 
@@ -547,7 +547,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 42::int2");
             const rows = await result.rows.collect();
 
@@ -564,7 +564,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 123456::int4");
             const rows = await result.rows.collect();
 
@@ -584,7 +584,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT NULL::int4, 456::int4");
             const rows = await result.rows.collect();
 
@@ -607,7 +607,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 9007199254740992::int8, NULL::int8");
             const rows = await result.rows.collect();
 
@@ -630,7 +630,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 3.14::float4, NULL::float4");
             const rows = await result.rows.collect();
 
@@ -648,7 +648,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 3.141592653589793::float8");
             const rows = await result.rows.collect();
 
@@ -665,7 +665,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 'hello world'::text");
             const rows = await result.rows.collect();
 
@@ -682,7 +682,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 'varchar value'::varchar");
             const rows = await result.rows.collect();
 
@@ -699,7 +699,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT '{}'::json");
             const rows = await result.rows.collect();
 
@@ -716,7 +716,7 @@ describe("Client API", () => {
                 ),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const result = await cl.query("SELECT 'raw-value'::unknown_type");
             const rows = await result.rows.collect();
 
@@ -732,7 +732,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const date = new Date("2024-01-15T10:30:00Z");
             await cl.query("SELECT $1", date);
 
@@ -747,7 +747,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const bigNum = 9007199254740991n;
             await cl.query("SELECT $1", bigNum);
 
@@ -760,7 +760,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             await cl.query("SELECT $1, $2", true, false);
 
             expect(mockHttpTransport.statement).toHaveBeenCalledWith("query", "SELECT $1, $2", ["t", "f"]);
@@ -772,7 +772,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             await cl.query("SELECT $1, $2", 42, 3.14);
 
             expect(mockHttpTransport.statement).toHaveBeenCalledWith("query", "SELECT $1, $2", ["42", "3.14"]);
@@ -784,7 +784,7 @@ describe("Client API", () => {
                 rows: toCollectableIterator((async function* () {})()),
             });
 
-            const cl = client({ connectionString: "postgres://user:pass@localhost:5432/mydb" });
+            const cl = client(defaultClientConfig("postgres://user:pass@localhost:5432/mydb"));
             const obj = { toString: () => "custom-object" };
             await cl.query("SELECT $1", obj);
 

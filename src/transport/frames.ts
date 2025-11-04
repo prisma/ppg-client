@@ -54,7 +54,7 @@ export type WebSocketAuthFrame = {
 
 export type ColumnMetadata = {
     name: string;
-    oid: number;
+    typeOid: number;
 };
 
 export type DataRowDescription = {

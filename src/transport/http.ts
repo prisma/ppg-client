@@ -4,7 +4,7 @@ import { createMultipartStream } from "./multipart.ts";
 import { parseNDJSONResponse } from "./ndjson.ts";
 import { type BaseTransport, FRAME_URNS, MIME_TYPES, type StatementResponse, type TransportConfig } from "./shared.ts";
 
-const HTTP_REQUEST_PATH = "/v0/statement"
+const HTTP_REQUEST_PATH = "/v0/statement";
 
 export interface HttpTransport extends BaseTransport {}
 

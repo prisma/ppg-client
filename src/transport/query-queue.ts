@@ -88,7 +88,7 @@ function newRunningQuery(): RunningQuery {
         // Populate columns
         columns = descr.columns.map((col) => ({
             name: col.name,
-            oid: col.oid,
+            oid: col.typeOid,
         }));
         // Resolve the promise now that we have columns
         // The rows iterator was already created and is ready to stream

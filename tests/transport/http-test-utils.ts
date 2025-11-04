@@ -2,8 +2,12 @@ import { Readable } from "node:stream";
 import Busboy from "busboy";
 import { expect, vi } from "vitest";
 import { BINARY, byteArrayParameter } from "../../src/common/types.ts";
-import type { ExtendedParamFrame, QueryDescriptorFrame, ResponseFrame } from "../../src/transport/frames.ts";
-import type { Column } from "../../src/transport/shared.ts";
+import type {
+    ColumnMetadata,
+    ExtendedParamFrame,
+    QueryDescriptorFrame,
+    ResponseFrame,
+} from "../../src/transport/frames.ts";
 import { utf8ByteLength } from "../../src/transport/shims.ts";
 
 /**
@@ -336,7 +340,7 @@ export class MockHttpServer {
     /**
      * Configure response: send column descriptor
      */
-    respondWithColumns(columns: Column[]): this {
+    respondWithColumns(columns: ColumnMetadata[]): this {
         this.responseFrames.push({
             columns,
         });

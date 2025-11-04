@@ -19,7 +19,7 @@ describe("HTTP Transport", () => {
         it("should execute query with no parameters", async () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT 1", parameterCount: 0 })
-                .respondWithColumns([{ name: "result", oid: 23 }])
+                .respondWithColumns([{ name: "result", typeOid: 23 }])
                 .respondWithRow(["1"])
                 .respondWithComplete();
 
@@ -46,8 +46,8 @@ describe("HTTP Transport", () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT * FROM users" })
                 .respondWithColumns([
-                    { name: "id", oid: 23 },
-                    { name: "name", oid: 25 },
+                    { name: "id", typeOid: 23 },
+                    { name: "name", typeOid: 25 },
                 ])
                 .respondWithRow(["1", "Alice"])
                 .respondWithRow(["2", "Bob"])
@@ -75,8 +75,8 @@ describe("HTTP Transport", () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT * FROM nullable_table" })
                 .respondWithColumns([
-                    { name: "id", oid: 23 },
-                    { name: "optional_field", oid: 25 },
+                    { name: "id", typeOid: 23 },
+                    { name: "optional_field", typeOid: 25 },
                 ])
                 .respondWithRow(["1", null])
                 .respondWithRow(["2", "value"])
@@ -99,7 +99,7 @@ describe("HTTP Transport", () => {
         it("should execute exec statement kind", async () => {
             mockServer
                 .expectQueryDescriptor({ kind: "exec", sql: "INSERT INTO users (name) VALUES ($1)" })
-                .respondWithColumns([{ name: "rowsAffected", oid: 23 }])
+                .respondWithColumns([{ name: "rowsAffected", typeOid: 23 }])
                 .respondWithRow(["1"])
                 .respondWithComplete();
 
@@ -130,7 +130,7 @@ describe("HTTP Transport", () => {
                     sql: "SELECT $1",
                     parameterCount: 1,
                 })
-                .respondWithColumns([{ name: "result", oid: 25 }])
+                .respondWithColumns([{ name: "result", typeOid: 25 }])
                 .respondWithRow([shortText])
                 .respondWithComplete();
 
@@ -156,7 +156,7 @@ describe("HTTP Transport", () => {
                     sql: "SELECT $1",
                     parameterCount: 1,
                 })
-                .respondWithColumns([{ name: "result", oid: 17 }])
+                .respondWithColumns([{ name: "result", typeOid: 17 }])
                 .respondWithRow(["binary_data"])
                 .respondWithComplete();
 
@@ -178,7 +178,7 @@ describe("HTTP Transport", () => {
                     sql: "SELECT $1",
                     parameterCount: 1,
                 })
-                .respondWithColumns([{ name: "result", oid: 25 }])
+                .respondWithColumns([{ name: "result", typeOid: 25 }])
                 .respondWithRow([null])
                 .respondWithComplete();
 
@@ -208,7 +208,7 @@ describe("HTTP Transport", () => {
                     parameterCount: 1,
                 })
                 .expectTextParam({ byteSize: 2000 })
-                .respondWithColumns([{ name: "result", oid: 25 }])
+                .respondWithColumns([{ name: "result", typeOid: 25 }])
                 .respondWithRow(["large_text_result"])
                 .respondWithComplete();
 
@@ -237,7 +237,7 @@ describe("HTTP Transport", () => {
                     parameterCount: 1,
                 })
                 .expectBinaryParam({ byteSize: 2048 })
-                .respondWithColumns([{ name: "result", oid: 17 }])
+                .respondWithColumns([{ name: "result", typeOid: 17 }])
                 .respondWithRow(["binary_result"])
                 .respondWithComplete();
 
@@ -265,7 +265,7 @@ describe("HTTP Transport", () => {
                     parameterCount: 1,
                 })
                 .expectTextParam({ byteSize: 2000 })
-                .respondWithColumns([{ name: "result", oid: 25 }])
+                .respondWithColumns([{ name: "result", typeOid: 25 }])
                 .respondWithRow(["text_result"])
                 .respondWithComplete();
 
@@ -291,7 +291,7 @@ describe("HTTP Transport", () => {
                     parameterCount: 1,
                 })
                 .expectTextParam({ byteSize: new TextEncoder().encode(emojiText).byteLength })
-                .respondWithColumns([{ name: "result", oid: 25 }])
+                .respondWithColumns([{ name: "result", typeOid: 25 }])
                 .respondWithRow([emojiText])
                 .respondWithComplete();
 
@@ -323,10 +323,10 @@ describe("HTTP Transport", () => {
                 .expectTextParam({ byteSize: 2000 })
                 .expectBinaryParam({ byteSize: 2048 })
                 .respondWithColumns([
-                    { name: "col1", oid: 25 },
-                    { name: "col2", oid: 25 },
-                    { name: "col3", oid: 17 },
-                    { name: "col4", oid: 17 },
+                    { name: "col1", typeOid: 25 },
+                    { name: "col2", typeOid: 25 },
+                    { name: "col3", typeOid: 17 },
+                    { name: "col4", typeOid: 17 },
                 ])
                 .respondWithRow(["short", "long_result", "small_bin", "large_bin"])
                 .respondWithComplete();
@@ -355,9 +355,9 @@ describe("HTTP Transport", () => {
                     parameterCount: 3,
                 })
                 .respondWithColumns([
-                    { name: "a", oid: 25 },
-                    { name: "b", oid: 25 },
-                    { name: "c", oid: 25 },
+                    { name: "a", typeOid: 25 },
+                    { name: "b", typeOid: 25 },
+                    { name: "c", typeOid: 25 },
                 ])
                 .respondWithRow(["foo", "bar", "baz"])
                 .respondWithComplete();
@@ -399,7 +399,7 @@ describe("HTTP Transport", () => {
         it("should support async iteration over rows", async () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT * FROM items" })
-                .respondWithColumns([{ name: "id", oid: 23 }])
+                .respondWithColumns([{ name: "id", typeOid: 23 }])
                 .respondWithRow(["1"])
                 .respondWithRow(["2"])
                 .respondWithRow(["3"])
@@ -427,7 +427,7 @@ describe("HTTP Transport", () => {
         it("should support collect() method", async () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT * FROM items" })
-                .respondWithColumns([{ name: "id", oid: 23 }])
+                .respondWithColumns([{ name: "id", typeOid: 23 }])
                 .respondWithRow(["1"])
                 .respondWithRow(["2"])
                 .respondWithComplete();
@@ -466,7 +466,7 @@ describe("HTTP Transport", () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT $1", parameterCount: 1 })
                 .expectTextParam({ byteSize: textData.byteLength })
-                .respondWithColumns([{ name: "result", oid: 25 }])
+                .respondWithColumns([{ name: "result", typeOid: 25 }])
                 .respondWithRow(["text_result"])
                 .respondWithComplete();
 
@@ -488,7 +488,7 @@ describe("HTTP Transport", () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT $1", parameterCount: 1 })
                 .expectTextParam({ byteSize: new TextEncoder().encode(largeText).byteLength })
-                .respondWithColumns([{ name: "result", oid: 25 }])
+                .respondWithColumns([{ name: "result", typeOid: 25 }])
                 .respondWithRow(["stream_result"])
                 .respondWithComplete();
 
@@ -523,7 +523,7 @@ describe("HTTP Transport", () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT $1", parameterCount: 1 })
                 .expectBinaryParam({ byteSize: 2048 })
-                .respondWithColumns([{ name: "result", oid: 17 }])
+                .respondWithColumns([{ name: "result", typeOid: 17 }])
                 .respondWithRow(["binary_stream_result"])
                 .respondWithComplete();
 
@@ -606,7 +606,7 @@ describe("HTTP Transport", () => {
         it("should include database parameter in URL when provided", async () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT 1" })
-                .respondWithColumns([{ name: "result", oid: 23 }])
+                .respondWithColumns([{ name: "result", typeOid: 23 }])
                 .respondWithRow(["1"])
                 .respondWithComplete();
 
@@ -626,7 +626,7 @@ describe("HTTP Transport", () => {
         it("should not include database parameter when not provided", async () => {
             mockServer
                 .expectQueryDescriptor({ kind: "query", sql: "SELECT 1" })
-                .respondWithColumns([{ name: "result", oid: 23 }])
+                .respondWithColumns([{ name: "result", typeOid: 23 }])
                 .respondWithRow(["1"])
                 .respondWithComplete();
 
