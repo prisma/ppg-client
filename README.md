@@ -16,11 +16,11 @@ Install this package using your package manager and registry of choice:
 ## Quick Start
 
 ```ts
-import { prismaPostgres } from "@prisma/ppg";
+import { prismaPostgres, defaultClientConfig } from "@prisma/ppg";
 
-const ppg = prismaPostgres({
-  connectionString: process.env.PRISMA_DIRECT_TCP_URL
-});
+const ppg = prismaPostgres(
+  defaultClientConfig(process.env.PRISMA_DIRECT_TCP_URL!)
+);
 
 // SQL template literals with automatic parameterization
 const users = await ppg.sql<User>`SELECT * FROM users WHERE id = ${userId}`.collect();
@@ -42,12 +42,22 @@ The `prismaPostgres()` function returns a feature-rich client with SQL template 
 ### Setup
 
 ```ts
-import { prismaPostgres } from "@prisma/ppg";
+import { prismaPostgres, defaultClientConfig } from "@prisma/ppg";
 
-const ppg = prismaPostgres({
-  connectionString: "postgres://user:password@host:port/database"
+// Recommended: Use defaultClientConfig to include default parsers and serializers
+const ppg = prismaPostgres(
+  defaultClientConfig("postgres://user:password@host:port/database")
+);
+
+// Or manually configure (no default parsers/serializers):
+const ppgCustom = prismaPostgres({
+  connectionString: "postgres://user:password@host:port/database",
+  parsers: [/* your custom parsers */],
+  serializers: [/* your custom serializers */]
 });
 ```
+
+> **Important**: Use `defaultClientConfig()` to automatically include default parsers and serializers for common PostgreSQL types (Date, JSON, BigInt, etc.). Without it, you'll need to manually configure parsers and serializers.
 
 ### Query Modes
 
@@ -191,27 +201,57 @@ try {
 
 ### Type Support
 
-The client handles PostgreSQL types with automatic parsing:
+When using `defaultClientConfig()`, the client automatically handles PostgreSQL types:
 
 ```ts
-// JSON/JSONB
-const jsonData = { key: "value", nested: { count: 42 } };
-await ppg.sql.exec`INSERT INTO data (json_col) VALUES (${JSON.stringify(jsonData)})`;
-const rows = await ppg.sql<{ json_col: object }>`SELECT json_col FROM data`.collect();
+import { prismaPostgres, defaultClientConfig } from "@prisma/ppg";
 
-// BigInt
-const bigints = await ppg.sql<{ big: bigint }>`SELECT 9007199254740991::int8 as big`.collect();
+const ppg = prismaPostgres(defaultClientConfig(process.env.DATABASE_URL!));
+
+// JSON/JSONB - automatic parsing
+const rows = await ppg.sql<{ data: { key: string } }>`
+  SELECT '{"key": "value"}'::jsonb as data
+`.collect();
+console.log(rows[0].data.key); // "value" (already parsed)
+
+// BigInt - parsed to JavaScript BigInt
+const bigints = await ppg.sql<{ big: bigint }>`
+  SELECT 9007199254740991::int8 as big
+`.collect();
 console.log(typeof bigints[0].big); // "bigint"
 
-// Date serialization
+// Date/Timestamp - parsed to Date objects
+const dates = await ppg.sql<{ created: Date }>`
+  SELECT NOW() as created
+`.collect();
+console.log(dates[0].created instanceof Date); // true
+
+// Date serialization - automatic conversion
 const testDate = new Date("2024-01-15T10:30:00Z");
 await ppg.sql.exec`INSERT INTO events (timestamp) VALUES (${testDate})`;
 
 // Null handling
-const rows = await ppg.sql<{ id: number | null; name: string | null }>`
+const rows2 = await ppg.sql<{ id: number | null; name: string | null }>`
   SELECT NULL::int as id, 'test'::text as name
 `.collect();
 ```
+
+#### Default Type Mappings
+
+With `defaultClientConfig()`, the following types are automatically parsed:
+
+| PostgreSQL Type | JavaScript Type | OID |
+|----------------|-----------------|-----|
+| `boolean` | `boolean` | 16 |
+| `int2`, `int4` | `number` | 21, 23 |
+| `int8` | `bigint` | 20 |
+| `float4`, `float8` | `number` | 700, 701 |
+| `text`, `varchar` | `string` | 25, 1043 |
+| `json`, `jsonb` | `object` | 114, 3802 |
+| `date` | `Date` | 1082 |
+| `time` | `string` | 1083 |
+| `timestamp` | `Date` | 1114 |
+| `timestamptz` | `Date` | 1184 |
 
 ---
 
@@ -222,12 +262,22 @@ The `client()` function provides direct control over query execution and session
 ### Setup
 
 ```ts
-import { client } from "@prisma/ppg";
+import { client, defaultClientConfig } from "@prisma/ppg";
 
-const cl = client({
-  connectionString: "postgres://user:password@host:port/database"
+// Recommended: Use defaultClientConfig to include default parsers and serializers
+const cl = client(
+  defaultClientConfig("postgres://user:password@host:port/database")
+);
+
+// Or manually configure:
+const clCustom = client({
+  connectionString: "postgres://user:password@host:port/database",
+  parsers: [/* your custom parsers */],
+  serializers: [/* your custom serializers */]
 });
 ```
+
+> **Important**: Use `defaultClientConfig()` to get automatic type parsing (Date, JSON, BigInt, etc.) and serialization (Date, BigInt, Number).
 
 ### Query Modes
 
@@ -354,10 +404,10 @@ rows.forEach(row => {
 
 #### Custom Parsers
 
-Parse PostgreSQL types with custom logic:
+You can override or add parsers on top of the defaults:
 
 ```ts
-import { client } from "@prisma/ppg";
+import { client, defaultClientConfig } from "@prisma/ppg";
 import type { ValueParser } from "@prisma/ppg";
 
 const uuidParser: ValueParser<string> = {
@@ -365,17 +415,25 @@ const uuidParser: ValueParser<string> = {
   parse: (value: string | null) => value ? value.toUpperCase() : null
 };
 
+const config = defaultClientConfig("postgres://...");
 const cl = client({
-  connectionString: "...",
-  parsers: [uuidParser]
+  ...config,
+  parsers: [...config.parsers, uuidParser], // Add to defaults
+});
+
+// Or replace defaults entirely:
+const clCustom = client({
+  connectionString: "postgres://...",
+  parsers: [uuidParser], // Only your custom parsers
 });
 ```
 
 #### Custom Serializers
 
-Serialize JavaScript types to PostgreSQL:
+Add custom serializers on top of defaults:
 
 ```ts
+import { client, defaultClientConfig } from "@prisma/ppg";
 import type { ValueSerializer } from "@prisma/ppg";
 
 class Point { constructor(public x: number, public y: number) {} }
@@ -385,13 +443,16 @@ const pointSerializer: ValueSerializer<Point> = {
   serialize: (value: Point) => `(${value.x},${value.y})`
 };
 
+const config = defaultClientConfig("postgres://...");
 const cl = client({
-  connectionString: "...",
-  serializers: [pointSerializer]
+  ...config,
+  serializers: [pointSerializer, ...config.serializers], // Your serializer first
 });
 
 await cl.query("INSERT INTO locations (point) VALUES ($1)", new Point(10, 20));
 ```
+
+> **Note**: Custom serializers are checked in order. Put your custom serializers before defaults so they take precedence.
 
 ### Binary Parameters
 
@@ -440,12 +501,27 @@ try {
 
 ## API Reference
 
+### `defaultClientConfig(connectionString: string | URL): ClientConfig`
+
+Creates a client configuration with default parsers and serializers.
+
+Returns:
+- `connectionString: string` - The connection URL
+- `parsers: ValueParser<unknown>[]` - Default type parsers (Date, JSON, BigInt, etc.)
+- `serializers: ValueSerializer<unknown>[]` - Default type serializers (Date, BigInt, Number)
+
+```ts
+import { prismaPostgres, defaultClientConfig } from "@prisma/ppg";
+
+const ppg = prismaPostgres(defaultClientConfig(process.env.DATABASE_URL!));
+```
+
 ### `prismaPostgres(config: PrismaPostgresConfig): PrismaPostgres`
 
 Configuration:
 - `connectionString: string` - PostgreSQL connection URL
-- `parsers?: ValueParser<unknown>[]` - Custom type parsers
-- `serializers?: ValueSerializer<unknown>[]` - Custom type serializers
+- `parsers?: ValueParser<unknown>[]` - Custom type parsers (use `defaultClientConfig` for defaults)
+- `serializers?: ValueSerializer<unknown>[]` - Custom type serializers (use `defaultClientConfig` for defaults)
 
 Returns:
 - `sql` - SQL template literal tag
@@ -460,8 +536,8 @@ Returns:
 
 Configuration:
 - `connectionString: string` - PostgreSQL connection URL
-- `parsers?: ValueParser<unknown>[]` - Custom type parsers
-- `serializers?: ValueSerializer<unknown>[]` - Custom type serializers
+- `parsers?: ValueParser<unknown>[]` - Custom type parsers (use `defaultClientConfig` for defaults)
+- `serializers?: ValueSerializer<unknown>[]` - Custom type serializers (use `defaultClientConfig` for defaults)
 
 Returns:
 - `query(sql, ...params): Promise<Resultset>` - Execute query

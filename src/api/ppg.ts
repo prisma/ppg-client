@@ -2,6 +2,10 @@ import type { CollectableIterator } from "../common/types.ts";
 import { toCollectableIterator } from "../common/types.ts";
 import { type ClientConfig, type Statements, client } from "./client.ts";
 
+/**
+ * Configuration for the PrismaPostgres client.
+ * Identical to {@link ClientConfig} - use {@link defaultClientConfig} for recommended defaults.
+ */
 export interface PrismaPostgresConfig extends ClientConfig {}
 
 /**

@@ -1,13 +1,45 @@
+/**
+ * Constant for binary parameter format (PostgreSQL bytea type).
+ * Use with {@link byteArrayParameter} and {@link boundedByteStreamParameter}.
+ */
 export const BINARY = "binary",
+    /**
+     * Constant for text parameter format (PostgreSQL text type).
+     * Use with {@link byteArrayParameter} and {@link boundedByteStreamParameter}.
+     */
     TEXT = "text";
 
+/**
+ * Format for binary parameters - either "binary" or "text".
+ */
 export type ParameterFormat = typeof BINARY | typeof TEXT;
 
+/**
+ * A ReadableStream parameter with a predetermined byte length.
+ * Used for streaming large binary or text data to PostgreSQL efficiently.
+ */
 export interface BoundedByteStreamParameter extends ReadableStream<Uint8Array> {
+    /** Total number of bytes in the stream */
     readonly byteLength: number;
+    /** Format: "binary" for bytea, "text" for text */
     readonly format: ParameterFormat;
 }
 
+/**
+ * Creates a bounded byte stream parameter for efficient streaming of large binary/text data.
+ *
+ * @param readableStream - The stream of bytes to send
+ * @param format - BINARY for bytea, TEXT for text encoding
+ * @param byteLength - Total number of bytes in the stream (must be known upfront)
+ * @returns A parameter suitable for query/exec methods
+ *
+ * @example
+ * ```ts
+ * const stream = getFileStream();
+ * const param = boundedByteStreamParameter(stream, BINARY, 1024);
+ * await client.query("INSERT INTO files (data) VALUES ($1)", param);
+ * ```
+ */
 export function boundedByteStreamParameter(
     readableStream: ReadableStream<Uint8Array>,
     format: ParameterFormat,
@@ -24,10 +56,29 @@ function hasFormat(x: object) {
     return "format" in x && (x.format === TEXT || x.format === BINARY);
 }
 
+/**
+ * A Uint8Array parameter with format specification.
+ * Used for sending binary or text data to PostgreSQL.
+ */
 export interface ByteArrayParameter extends Uint8Array {
+    /** Format: "binary" for bytea, "text" for text encoding */
     format: ParameterFormat;
 }
 
+/**
+ * Creates a byte array parameter from a Uint8Array.
+ *
+ * @param array - The bytes to send
+ * @param format - BINARY for bytea, TEXT for text encoding
+ * @returns A parameter suitable for query/exec methods
+ *
+ * @example
+ * ```ts
+ * const bytes = new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f]);
+ * const param = byteArrayParameter(bytes, BINARY);
+ * await client.query("INSERT INTO files (data) VALUES ($1)", param);
+ * ```
+ */
 export function byteArrayParameter(array: Uint8Array, format: ParameterFormat) {
     return Object.assign(array, { format });
 }
@@ -36,6 +87,10 @@ export function isByteArrayParameter(x: unknown): x is ByteArrayParameter {
     return x instanceof Uint8Array && hasFormat(x);
 }
 
+/**
+ * Raw parameter types accepted by query and exec methods.
+ * Includes strings, null, and binary parameters.
+ */
 export type RawParameter = string | null | ByteArrayParameter | BoundedByteStreamParameter;
 
 /**
@@ -138,7 +193,8 @@ export function toCollectableIterator<TSource, TResult = TSource>(
 }
 
 /**
- * Marker base error class
+ * Base error class for all PPG client errors.
+ * All specific error types (ValidationError, DatabaseError, etc.) extend this class.
  */
 export class GenericError extends Error {
     constructor(msg: string, opts?: ErrorOptions) {
@@ -147,6 +203,9 @@ export class GenericError extends Error {
     }
 }
 
+/**
+ * Error thrown when input validation fails (invalid parameters, configuration, etc.).
+ */
 export class ValidationError extends GenericError {
     constructor(msg: string, opts?: ErrorOptions) {
         super(msg, opts);
@@ -158,7 +217,13 @@ interface HttpResponseErrorDetails {
     readonly statusCode: number;
     readonly message: string;
 }
+
+/**
+ * Error thrown when an HTTP request to the database fails.
+ * Contains the HTTP status code for debugging.
+ */
 export class HttpResponseError extends GenericError {
+    /** HTTP status code from the failed request */
     public readonly status: number;
     constructor({ message, statusCode }: HttpResponseErrorDetails, opts?: ErrorOptions) {
         super(message, opts);
@@ -173,8 +238,14 @@ interface WebSocketErrorDetails {
     readonly message: string;
 }
 
+/**
+ * Error thrown when a WebSocket connection fails or closes unexpectedly.
+ * Contains the WebSocket closure code and reason for debugging.
+ */
 export class WebSocketError extends GenericError {
+    /** WebSocket closure code (e.g., 1000 for normal closure) */
     public readonly closureCode?: number;
+    /** Human-readable closure reason */
     public readonly closureReason?: string;
     constructor({ message, closureCode, closureReason }: WebSocketErrorDetails, opts?: ErrorOptions) {
         super(`${message}${closureStr(closureCode, closureReason)}`, opts);
@@ -188,14 +259,38 @@ function closureStr(closureCode: number | undefined, closureReason: string | und
     return !closureCode && !closureReason ? "" : ` (${closureCode} : ${closureReason})`;
 }
 
+/**
+ * Details for database errors from PostgreSQL.
+ */
 export interface DatabaseErrorDetails {
+    /** Error message from PostgreSQL */
     readonly message: string;
+    /** PostgreSQL error code (e.g., "23505" for unique violation) */
     readonly code: string;
+    /** Additional error fields from PostgreSQL */
     readonly [key: string]: string;
 }
 
+/**
+ * Error thrown when PostgreSQL returns an error.
+ * Contains the PostgreSQL error code and additional details for debugging.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await client.query("INSERT INTO users (email) VALUES ($1)", "duplicate@example.com");
+ * } catch (error) {
+ *   if (error instanceof DatabaseError) {
+ *     console.log(error.code); // "23505" (unique violation)
+ *     console.log(error.details); // Additional PostgreSQL error fields
+ *   }
+ * }
+ * ```
+ */
 export class DatabaseError extends GenericError {
+    /** PostgreSQL error code (SQLSTATE) */
     readonly code: string;
+    /** Additional error details from PostgreSQL (severity, hint, etc.) */
     readonly details: Record<string, string>;
     constructor(details: DatabaseErrorDetails, opts?: ErrorOptions) {
         super(details.message, opts);
